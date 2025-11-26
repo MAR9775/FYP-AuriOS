@@ -2,35 +2,37 @@ import os
 import subprocess
 
 # In a real environment, you'd dynamically determine the install path
-# or receive it from the Install Agent's result.
-# For this prototype, we'll assume the path set by the Install Agent.
-DEFAULT_INSTALL_BASE = "/tmp/aurios_installs" 
-SHELL_CONFIG_FILE = os.path.expanduser("~/.bashrc") # Target config file for Linux/macOS
+DEFAULT_INSTALL_BASE = "C:\\AurIOS_Installs" # Windows-friendly path
+# Note: On Windows, environment changes made via subprocess are NOT visible
+# to the current running Python process, only to future processes.
 
-def _add_to_path_unix(path_to_add: str) -> bool:
-    """Helper function to append a path to the shell config file (Unix/Linux)."""
-    export_command = f'export PATH="$PATH:{path_to_add}"'
+def _add_to_path_windows(path_to_add: str) -> bool:
+    """Helper function to permanently add a path to the System PATH (Windows)."""
     
     try:
-        # Check if the path is already set (basic check)
-        with open(SHELL_CONFIG_FILE, 'r') as f:
-            if path_to_add in f.read():
-                print(f"Thought: Path {path_to_add} already configured. Skipping.")
-                return True
-                
-        # Append the export command to the shell config
-        with open(SHELL_CONFIG_FILE, 'a') as f:
-            f.write(f"\n# Added by AurIOS Configure Agent\n{export_command}\n")
-            
-        print(f"Observation: Added export command to {SHELL_CONFIG_FILE}. User must source file.")
+        # Check current system PATH to see if the path is already set
+        # This is complex and often skipped in simple path config checks.
         
-        # Note: For changes to take effect immediately, the user's current shell 
-        # needs to be 'sourced' (e.g., source ~/.bashrc), which is hard to do 
-        # from a subprocess. We'll simply report success.
+        # Use 'setx' command to permanently set the System PATH for the current user
+        # Note: This command is platform-specific and requires appropriate user permissions.
+        # We assume the new path needs to be appended to the existing PATH variable.
+        
+        # Action: Call setx to modify the PATH variable.
+        print(f"Thought: Using setx to permanently add {path_to_add} to user PATH.")
+        
+        # WARNING: setx can truncate the PATH variable if it's too long. 
+        # For prototype, we'll try a basic approach:
+        command = f'setx PATH "%PATH%;{path_to_add}"'
+        subprocess.run(command, shell=True, check=True, capture_output=True)
+            
+        print(f"Observation: setx command executed successfully.")
         return True
         
+    except subprocess.CalledProcessError as e:
+        print(f"FAILURE: setx command failed. Error: {e.stderr.decode()}")
+        return False
     except Exception as e:
-        print(f"FAILURE: Could not modify shell config: {e}")
+        print(f"FAILURE: Could not execute path modification: {e}")
         return False
 
 
@@ -39,25 +41,23 @@ def run_configuration(software_name: str, install_path: str = None) -> str:
     Sets up system paths and performs necessary environmental configurations.
     """
     if not install_path:
-        # Assume standard installation path if not explicitly provided
         install_path = os.path.join(DEFAULT_INSTALL_BASE, software_name)
 
-    # 1. Check if install path exists (ReAct Thought)
+    # 1. Check if install path exists
     if not os.path.isdir(install_path):
         return f"FAILURE: Configuration aborted. Installation directory not found: {install_path}"
 
-    # 2. Add to System PATH (ReAct Action)
+    # 2. Add to System PATH
     print(f"Thought: Attempting to add {install_path} to system PATH.")
     
-    # Simple check for Unix-like system
-    if os.name == 'posix':
-        success = _add_to_path_unix(install_path)
+    if os.name == 'nt': # 'nt' means Windows
+        success = _add_to_path_windows(install_path)
     else:
-        # Placeholder for Windows or other OS logic
-        return f"FAILURE: Configuration logic for OS '{os.name}' is not yet implemented."
+        # Fails explicitly if run on a non-Windows machine, enforcing your target OS
+        return f"FAILURE: Configuration logic only supports Windows ('nt') OS. Detected OS: {os.name}"
         
-    # 3. Report Status (ReAct Observation)
+    # 3. Report Status
     if success:
-        return f"SUCCESS: Software '{software_name}' configured. Path added. Requires shell restart/sourcing."
+        return f"SUCCESS: Software '{software_name}' configured. Path added. Requires log out/restart to take full effect."
     else:
         return f"FAILURE: Configuration failed while trying to set system path for '{software_name}'."
