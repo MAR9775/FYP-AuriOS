@@ -1,8 +1,8 @@
 1) Core LLM / Agent Framework:
   These libraries form the foundation for building powerful AI agents. LangChain is widely used in the industry for orchestrating LLM reasoning, tools, memory, and the ReAct decision-making pattern.
-    -> langchain
-    -> langchain-core
-    -> langchain-community
+      -> langchain
+      -> langchain-core
+      -> langchain-community
 
 2) Local LLM Integration:
     These packages help your system communicate with locally hosted LLM models such as Ollama, LM Studio, GPT4All, or vLLM.
