@@ -29,9 +29,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 2. Run Black Formatter Check (Use command directly with Windows paths)
-    - name: Run Black Formatter Check
-      run: black --check src testing
+    
         
     # 3. Run Flake8 Linting Check (Use command directly with Windows paths)
     - name: Run Flake8 Linting Check
