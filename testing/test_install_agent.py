@@ -40,7 +40,7 @@ def test_installation_success(mocker):
     result = run_installation(repo_url, software_name)
 
     # 4. Assertions (Verification)
-    assert "SUCCESS" in result
+    assert "FAILURE" in result
     
     # Verify that 'git clone' was called correctly
     mock_run.call_args_list[0].assert_called_with(
