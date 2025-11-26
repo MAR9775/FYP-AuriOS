@@ -29,8 +29,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 2. Run Pytest Unit & Integration Tests (FINAL PATH FIX)
+    # 2. Run Pytest Unit & Integration Tests (PowerShell Path Workaround)
     - name: Run Pytest Unit & Integration Tests
-      env:
-        PYTHONPATH: ${{ github.workspace }}/src
-      run: pytest testing
+      run: |
+        # Use PowerShell to set the PYTHONPATH for the current session, resolving the 'src' import error.
+        $env:PYTHONPATH = "src"
+        pytest testing
