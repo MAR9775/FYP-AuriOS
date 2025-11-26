@@ -1,1 +1,23 @@
+1) Core LLM / Agent Framework:
+  These libraries form the foundation for building powerful AI agents. LangChain is widely used in the industry for orchestrating LLM reasoning, tools, memory, and the ReAct decision-making pattern.
+    -> langchain
+    -> langchain-core
+    -> langchain-community
+
+2) Local LLM Integration:
+    These packages help your system communicate with locally hosted LLM models such as Ollama, LM Studio, GPT4All, or vLLM.
+      -> requests — used to send HTTP calls to your local AI model endpoints.
+
+3) System & OS Interaction:
+    These tools let AI agents interact with the machine itself, enabling tasks like monitoring CPU usage, exploring directories, or managing processes.
+      -> psutil — useful for retrieving system information such as memory usage, running processes, CPU load, etc.
+         (Python’s built-ins like os and subprocess will handle most command-execution tasks.)
+
+4) CI/CD, Testing & Code Quality:
+    These ensure reliability, maintainability, and consistent formatting across your project.
+      -> pytest — the standard framework for unit, integration, and agent-behavior testing.
+      -> pytest-mock — invaluable for mocking system-level calls (e.g., preventing an agent from actually running git clone).
+      -> black — auto-formats code so every file follows the same clean style.
+      -> flake8 — analyzes your code to catch bugs, unused imports, styling issues, and potential errors early.
+
 
