@@ -29,10 +29,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 2. Add 'src' to Python Path (ULTIMATE FIX for Windows Import Errors)
-    - name: Set Python Path to include src
-      run: python -c "import sys; sys.path.append('src')"
-
-    # 3. Run Pytest Unit & Integration Tests
+    # 2. Run Pytest with In-line Path Fix (The definitive solution)
     - name: Run Pytest Unit & Integration Tests
-      run: pytest testing
+      run: |
+        # Append 'src' to Python path and then run pytest in the same command environment
+        python -c "import sys; sys.path.append('src')"
+        pytest testing
