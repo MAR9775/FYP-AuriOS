@@ -33,5 +33,5 @@ jobs:
     - name: Run Pytest Unit & Integration Tests
       run: |
         # Use PowerShell to set the PYTHONPATH environment variable using the absolute path.
-        $env:PYTHONPATH = "${{ github.workspace }}\src"
+        $env:PYTHONPATH = "${{ github.workspace }}"
         pytest testing
