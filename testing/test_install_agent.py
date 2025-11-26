@@ -1,6 +1,7 @@
 import os
 import pytest
 from unittest.mock import MagicMock
+import subprocess 
 from src.agents.install_agent import run_installation, INSTALL_DIR
 
 # Fixture to ensure the target directory is available, even though we are mocking

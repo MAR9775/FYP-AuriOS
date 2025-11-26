@@ -63,4 +63,4 @@ def test_configuration_setx_failure(mocker):
 
     # 5. Assertion
     assert "FAILURE" in result
-    assert "setx command failed" in result
+    assert "Configuration failed" in result
