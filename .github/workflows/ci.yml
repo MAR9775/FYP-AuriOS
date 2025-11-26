@@ -23,22 +23,20 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    # 1. Install Dependencies (Keep this multi-line)
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    # 2. Run Black Formatter Check (Use command directly with Windows paths)
     - name: Run Black Formatter Check
-      run: |
-        # Checks if code is formatted correctly (does not reformat)
-        black --check src/ testing/
+      run: black --check src testing
         
+    # 3. Run Flake8 Linting Check (Use command directly with Windows paths)
     - name: Run Flake8 Linting Check
-      run: |
-        # Checks code quality and common errors
-        flake8 src/ testing/
+      run: flake8 src testing
         
+    # 4. Run Pytest Unit & Integration Tests (Use command directly with Windows paths)
     - name: Run Pytest Unit & Integration Tests
-      run: |
-        # Execute tests using Pytest (uses mocks to prevent real system changes)
-        pytest testing/
+      run: pytest testing
