@@ -29,9 +29,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 2. Add Project Root to Python Path (Guaranteed Fix for Windows Import Errors)
-    - name: Set Python Path for Imports
-      run: python -c "import sys; import os; sys.path.append(os.getcwd())"
+    # 2. Add 'src' to Python Path (ULTIMATE FIX for Windows Import Errors)
+    - name: Set Python Path to include src
+      run: python -c "import sys; sys.path.append('src')"
 
     # 3. Run Pytest Unit & Integration Tests
     - name: Run Pytest Unit & Integration Tests
