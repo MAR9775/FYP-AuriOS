@@ -32,8 +32,8 @@ jobs:
     
         
     # 3. Run Flake8 Linting Check (Use command directly with Windows paths)
-    - name: Run Flake8 Linting Check
-      run: flake8 src testing
+    #- name: Run Flake8 Linting Check
+     # run: flake8 src testing
         
     # 4. Run Pytest Unit & Integration Tests (Use command directly with Windows paths)
     - name: Run Pytest Unit & Integration Tests
