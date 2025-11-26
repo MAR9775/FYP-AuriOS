@@ -29,9 +29,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 2. Run Pytest with In-line Path Fix (The definitive solution)
+    # 2. Run Pytest with Absolute Path Fix (Final Guaranteed Solution)
     - name: Run Pytest Unit & Integration Tests
       run: |
-        # Append 'src' to Python path and then run pytest in the same command environment
-        python -c "import sys; sys.path.append('src')"
+        # Use PowerShell to set the PYTHONPATH environment variable using the absolute path.
+        $env:PYTHONPATH = "${{ github.workspace }}\src"
         pytest testing
