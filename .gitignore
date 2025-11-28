@@ -1,1 +1,124 @@
+#############################################
+# PYTHON STANDARD IGNORE
+#############################################
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+# Usually creates build artifacts and logs
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+coverage.json
+*.cover
+*.py,cover
+.cache
+nosetests.xml
+pytestdebug.log
+pytest_cache/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+profile_default/
+ipython_config.py
+
+# pyenv / uv / poetry / pipenv
+.python-version
+.pyvenv
 .venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# PyFlow / PDM / Hatch / Rye
+.pdm.toml
+.pdm-python
+.pdm/
+.pdm-build/
+.hatch/
+.rye/
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pytype
+.pytype/
+
+# Pyre
+.pyre/
+
+#############################################
+# PROJECT ARTIFACTS
+#############################################
+
+# Local development settings
+*.local
+*.env
+*.env.*
+.envrc
+.env.shared
+secrets.json
+credentials.json
+
+# Logs
+logs/
+*.log
+*.out
+*.err
+
+# Database
+*.sqlite3
+*.db
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+
+#############################################
+# BUILD SYSTEMS / C EXTENSIONS
+#############################################
+
+# Cython and com
