@@ -69,12 +69,12 @@ def launch_software(software_config):
     try:
         # Uses the default shell to execute the command (like running 'git' or 'code' in PowerShell)
         subprocess.Popen(launch_command, shell=True)
-        print(" Launch command sent successfully!")
-        return True
     except Exception as e:
         print(f" Failed to launch {software_config['name']}: {e}")
         return False
 
+    print(" Launch command sent successfully!")
+    return True
 
 # --- Software Configuration Catalog ---
 SOFTWARE_CATALOG = {
