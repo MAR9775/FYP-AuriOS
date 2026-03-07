@@ -1,13 +1,16 @@
-# --- Core LLM / Agent Framework ---
-langchain
-langchain-core
-langchain-community 
+# --- Core Agent Framework ---
+pydantic-ai[openai]
 
 # --- Local LLM Interaction ---
 requests
 
 # --- System & OS Interaction ---
 psutil
+python-dotenv
+
+# --- Web Framework ---
+fastapi
+uvicorn
 
 # --- CI/CD Testing and Quality Tools ---
 pytest

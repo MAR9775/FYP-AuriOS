@@ -95,7 +95,6 @@ dmypy.json
 # Local development settings
 *.local
 *.env
-*.env.*
 .envrc
 .env.shared
 secrets.json
