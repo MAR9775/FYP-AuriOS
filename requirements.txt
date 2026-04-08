@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pydantic
+aiosqlite
+websockets
+requests

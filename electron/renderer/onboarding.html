@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src http://127.0.0.1:8000;" />
+  <title>Welcome to AuriOS</title>
+  <link rel="stylesheet" href="styles/onboarding.css" />
+</head>
+<body>
+
+  <div class="ob-wrapper">
+    <div class="ob-card">
+
+      <h1 class="ob-header">◈ Welcome to AuriOS ◈</h1>
+      <p class="ob-subtitle">Your intelligent development assistant</p>
+
+      <!-- Section 1: Name -->
+      <div class="ob-section">
+        <label class="ob-label" for="name-input">What should I call you?</label>
+        <input type="text" id="name-input" class="ob-input"
+               placeholder="Enter your name..." autocomplete="off" />
+        <span id="name-error" class="ob-error hidden">Name is required</span>
+      </div>
+
+      <!-- Section 2: Experience -->
+      <div class="ob-section">
+        <label class="ob-label">What's your experience level?</label>
+        <div class="ob-radio-group">
+          <label class="ob-radio">
+            <input type="radio" name="experience" value="beginner" />
+            <span>Complete Beginner</span>
+          </label>
+          <label class="ob-radio">
+            <input type="radio" name="experience" value="some" />
+            <span>Some Experience</span>
+          </label>
+          <label class="ob-radio">
+            <input type="radio" name="experience" value="intermediate" />
+            <span>Intermediate Developer</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Section 3: Interests -->
+      <div class="ob-section">
+        <label class="ob-label">What will you mainly work on?</label>
+        <div class="ob-checkbox-group">
+          <label class="ob-checkbox">
+            <input type="checkbox" value="python_ai_ml" />
+            <span>Python / AI / ML</span>
+          </label>
+          <label class="ob-checkbox">
+            <input type="checkbox" value="web_dev" />
+            <span>Web Development</span>
+          </label>
+          <label class="ob-checkbox">
+            <input type="checkbox" value="data_science" />
+            <span>Data Science</span>
+          </label>
+          <label class="ob-checkbox">
+            <input type="checkbox" value="full_stack" />
+            <span>Full Stack</span>
+          </label>
+          <label class="ob-checkbox">
+            <input type="checkbox" value="exploring" />
+            <span>Just exploring</span>
+          </label>
+        </div>
+      </div>
+
+      <button id="start-btn" class="ob-start-btn">Get Started →</button>
+
+    </div>
+  </div>
+
+  <script src="scripts/onboarding.js"></script>
+</body>
+</html>

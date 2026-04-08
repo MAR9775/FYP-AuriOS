@@ -1,0 +1,57 @@
+"""ValidationAgent — re-runs DetectionAgent after install to confirm success."""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List
+
+from backend.agents.base_agent import BaseAgent
+from backend.agents.detection_agent import DetectionAgent
+
+
+class ValidationAgent(BaseAgent):
+    """Validate that expected software is now present on the system."""
+
+    # ------------------------------------------------------------------
+    # ReAct overrides
+    # ------------------------------------------------------------------
+
+    def reason(self, context: Dict[str, Any]) -> str:
+        expected = context.get("expected_software", [])
+        thought = f"Re-running DetectionAgent to verify installation of: {expected}."
+        self.logger.debug("[REASON] %s", thought)
+        return thought
+
+    def act(self, action: Dict[str, Any]) -> Dict[str, Any]:
+        task = action.get("task", {})
+        expected: List[str] = task.get("expected_software", [])
+
+        self.logger.info("[ACT] ValidationAgent re-detecting software…")
+        detection_result = DetectionAgent().run({})
+        installed_map: Dict[str, bool] = detection_result.get("installed", {})
+
+        validation: Dict[str, bool] = {}
+        for name in expected:
+            validation[name] = bool(installed_map.get(name, False))
+
+        return {
+            "validation": validation,
+            "full_detection": installed_map,
+        }
+
+    def observe(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        validation = result.get("validation", {})
+        passed = [k for k, v in validation.items() if v]
+        failed = [k for k, v in validation.items() if not v]
+        self.logger.info(
+            "[OBSERVE] validation passed=%s  failed=%s", passed, failed
+        )
+        return result
+
+    # ------------------------------------------------------------------
+    # Convenience entry point
+    # ------------------------------------------------------------------
+
+    def run(self, task: Dict[str, Any]) -> Dict[str, Any]:  # type: ignore[override]
+        self.reason(task)
+        raw = self.act({"task": task})
+        return self.observe(raw)

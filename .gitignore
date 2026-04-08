@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+*.so
+.env
+.venv
+venv/
+env/
+
+# Node / Electron
+node_modules/
+dist/
+build/
+out/
+.cache/
+
+# Database
+data/*.db
+
+# Logs
+logs/*.log
+
+# Installers
+installers/*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker helpers
+docker-daemon-config.json

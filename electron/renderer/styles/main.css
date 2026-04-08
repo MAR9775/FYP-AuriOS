@@ -1,0 +1,569 @@
+/* ── CSS Variables ──────────────────────────────────────────────────────── */
+:root {
+  --bg-primary:    #111827;
+  --bg-secondary:  #1f2937;
+  --bg-tertiary:   #374151;
+  --accent:        #6366f1;
+  --accent-light:  #818cf8;
+  --accent-dim:    rgba(99,102,241,0.15);
+  --text-primary:  #f1f5f9;
+  --text-secondary:#94a3b8;
+  --success:       #4ade80;
+  --warning:       #fbbf24;
+  --error:         #ef4444;
+
+  --titlebar-h:    40px;
+  --statusbar-h:   28px;
+  --input-bar-h:   64px;
+  --agent-panel-w: 220px;
+  --radius:        10px;
+}
+
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Title bar ──────────────────────────────────────────────────────────── */
+#titlebar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--titlebar-h);
+  background: #0d1117;
+  border-bottom: 1px solid #1e2a3a;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  z-index: 100;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+#titlebar-drag {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: drag;
+}
+
+#app-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-primary);
+}
+
+/* ── Window controls ────────────────────────────────────────────────────── */
+#window-controls {
+  display: flex;
+  gap: 4px;
+  -webkit-app-region: no-drag;
+  margin-left: 10px;
+}
+
+.wc-btn {
+  width: 32px;
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s ease, color 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wc-btn:hover            { background: var(--bg-secondary); color: var(--text-primary); }
+.wc-btn.wc-close:hover   { background: var(--error); color: #fff; }
+
+/* ── Main layout ────────────────────────────────────────────────────────── */
+#main {
+  position: fixed;
+  top: var(--titlebar-h);
+  bottom: var(--statusbar-h);
+  left: 0; right: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── Agent panel (left) ─────────────────────────────────────────────────── */
+#agent-panel {
+  width: var(--agent-panel-w);
+  min-width: var(--agent-panel-w);
+  background: var(--bg-secondary);
+  border-right: 1px solid #1e2a3a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px 12px;
+}
+
+#avatar-canvas {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 20px rgba(99,102,241,0.3);
+}
+
+#agent-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+#agent-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ── Chat panel (right) ─────────────────────────────────────────────────── */
+#chat-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+  position: relative;
+}
+
+/* ── View panels (dashboard / chat) ─────────────────────────────────────── */
+.view-panel {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.view-panel.hidden { display: none !important; }
+
+/* ── View transition animations ─────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.view-enter {
+  animation: fadeInUp 0.3s ease forwards;
+}
+
+/* ── Dashboard view ─────────────────────────────────────────────────────── */
+#dashboard-view {
+  flex: 1;
+  overflow-y: auto;
+}
+#dashboard-view::-webkit-scrollbar        { width: 6px; }
+#dashboard-view::-webkit-scrollbar-track  { background: var(--bg-secondary); border-radius: 3px; }
+#dashboard-view::-webkit-scrollbar-thumb  { background: var(--bg-tertiary); border-radius: 3px; }
+
+.dashboard-inner {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Greeting */
+.dashboard-greeting {
+  text-align: center;
+  animation: fadeInUp 0.4s ease both;
+}
+
+.greeting-text {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  line-height: 1.3;
+}
+
+.greeting-sub {
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+
+/* ── Template cards grid ─────────────────────────────────────────────────── */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  animation: fadeInUp 0.4s ease 0.05s both;
+}
+
+.template-card {
+  background: var(--bg-secondary);
+  border: 1px solid #1e2a3a;
+  border-radius: var(--radius);
+  padding: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease,
+              box-shadow 0.2s ease;
+  animation: fadeInUp 0.5s ease both;
+}
+.template-card:nth-child(1) { animation-delay: 0.08s; }
+.template-card:nth-child(2) { animation-delay: 0.14s; }
+.template-card:nth-child(3) { animation-delay: 0.20s; }
+.template-card:nth-child(4) { animation-delay: 0.26s; }
+.template-card:nth-child(5) { animation-delay: 0.32s; }
+.template-card:nth-child(6) { animation-delay: 0.38s; }
+
+.template-card:hover {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99,102,241,0.2);
+}
+
+.template-card:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.template-icon {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.template-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.template-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.template-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* ── Recent history section ──────────────────────────────────────────────── */
+.recent-section {
+  animation: fadeInUp 0.4s ease 0.3s both;
+}
+
+.recent-header {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.recent-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  color: var(--text-secondary);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-item:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.recent-item-icon { flex-shrink: 0; font-size: 13px; }
+
+/* ── Chat messages ──────────────────────────────────────────────────────── */
+#chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: fadeIn 0.25s ease;
+}
+
+/* Scrollbar */
+#chat-messages::-webkit-scrollbar        { width: 6px; }
+#chat-messages::-webkit-scrollbar-track  { background: var(--bg-secondary); border-radius: 3px; }
+#chat-messages::-webkit-scrollbar-thumb  { background: var(--accent); border-radius: 3px; }
+#chat-messages::-webkit-scrollbar-thumb:hover { background: var(--accent-light); }
+
+/* ── Chat bubbles ───────────────────────────────────────────────────────── */
+.message {
+  display: flex;
+  flex-direction: column;
+  max-width: 72%;
+  gap: 3px;
+}
+
+.message.user   { align-self: flex-end;  align-items: flex-end; }
+.message.auri   { align-self: flex-start; align-items: flex-start; }
+
+.bubble {
+  padding: 10px 14px;
+  border-radius: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.message.user .bubble {
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.message.auri .bubble {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-bottom-left-radius: 4px;
+}
+
+/* ── Typing indicator ───────────────────────────────────────────────────── */
+#typing-indicator {
+  padding: 8px 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+#typing-indicator.hidden { display: none; }
+
+/* ── Suggestions dropdown ────────────────────────────────────────────────── */
+.suggestions-dropdown {
+  position: absolute;
+  bottom: var(--input-bar-h);
+  left: 16px;
+  right: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid #1e2a3a;
+  border-radius: var(--radius);
+  box-shadow: 0 -8px 24px rgba(0,0,0,0.4);
+  z-index: 50;
+  overflow: hidden;
+  animation: fadeInUp 0.2s ease;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.suggestions-dropdown.hidden { display: none !important; }
+
+.suggestion-item {
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.suggestion-item:hover,
+.suggestion-item.active {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+}
+
+/* ── Input bar ──────────────────────────────────────────────────────────── */
+#input-bar {
+  min-height: var(--input-bar-h);
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid #1e2a3a;
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+#chat-input {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid #2d3a4a;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  max-height: 120px;
+  min-height: 40px;
+  line-height: 1.5;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+#chat-input::placeholder { color: var(--text-secondary); }
+#chat-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+#chat-input::-webkit-scrollbar { width: 4px; }
+#chat-input::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 2px; }
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 6px;
+  border-radius: 6px;
+  transition: background 0.2s ease, opacity 0.2s ease;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-bottom: 2px;
+}
+.icon-btn:hover { background: var(--bg-tertiary); }
+
+.send-btn { color: var(--accent); }
+.send-btn.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ── Backend offline banner ──────────────────────────────────────────────── */
+.backend-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 28px;
+  background: var(--error);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  letter-spacing: 0.03em;
+  transition: opacity 0.25s ease;
+}
+.backend-banner.hidden { display: none; }
+
+/* When banner is visible, push everything down */
+body:has(#backend-banner:not(.hidden)) #titlebar { top: 28px; }
+body:has(#backend-banner:not(.hidden)) #main     { top: calc(var(--titlebar-h) + 28px); }
+
+/* ── Status bar ─────────────────────────────────────────────────────────── */
+#statusbar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: var(--statusbar-h);
+  background: #0d1117;
+  border-top: 1px solid #1e2a3a;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 18px;
+  z-index: 100;
+}
+
+/* Span-based status items */
+.status-item {
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: default;
+  white-space: nowrap;
+  transition: color 0.25s ease;
+  position: relative;
+}
+
+.status-item.status-ok    { color: var(--success); }
+.status-item.status-error { color: var(--error);   cursor: pointer; }
+.status-item.status-error:hover { opacity: 0.85; }
+
+/* Legacy dot-style items kept for backwards compat (progress-panel etc.) */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #555;
+  transition: background 0.25s ease;
+}
+.status-dot.ok    { background: var(--success); }
+.status-dot.error { background: var(--error); }
+.status-dot.warn  { background: var(--warning); }
+
+.status-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+#statusbar-version {
+  margin-left: auto;
+  font-size: 11px;
+  color: #555;
+}
+
+/* ── Responsive: template grid ───────────────────────────────────────────── */
+/* 3 cols default, shrink at narrow widths */
+@media (max-width: 900px) {
+  .template-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .template-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Smooth panel / element transitions ──────────────────────────────────── */
+#agent-panel,
+#chat-panel,
+#input-bar,
+#chat-input,
+.bubble,
+.wc-btn,
+.icon-btn,
+.send-btn {
+  transition: all 0.25s ease;
+}
+
+/* Override specific transitions that need different timing */
+#chat-input { transition: border-color 0.25s ease, box-shadow 0.25s ease; }
+.icon-btn   { transition: background 0.25s ease, opacity 0.25s ease; }
+.wc-btn     { transition: background 0.25s ease, color 0.25s ease; }
+
+/* ── Utility ────────────────────────────────────────────────────────────── */
+.hidden { display: none !important; }

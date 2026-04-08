@@ -1,0 +1,45 @@
+/* agent.css — Avatar canvas & mic button animation styles */
+
+/* ── Canvas wrapper ──────────────────────────────────────────────────────── */
+.avatar-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Avatar canvas ───────────────────────────────────────────────────────── */
+#avatar-canvas {
+  display: block;
+  border-radius: 50%;
+  background: var(--bg-primary);
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 24px rgba(199, 54, 95, 0.3);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+#avatar-canvas:hover {
+  transform: scale(1.03);
+}
+
+#avatar-canvas.speaking {
+  box-shadow: 0 0 36px rgba(199, 54, 95, 0.7);
+}
+
+/* ── Mic button active / recording state ─────────────────────────────────── */
+#mic-btn.active,
+#mic-btn.recording {
+  color: var(--success, #4ade80);
+  box-shadow: 0 0 12px #c7365f;
+  animation: mic-pulse 1s infinite;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
