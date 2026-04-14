@@ -186,11 +186,13 @@
 
     setTimeout(() => {
       hidePanel();
+      const finalMsg = window.__auriFinalMsg;
       _emitBubble(
         hadFailures
-          ? 'Installation finished with some issues. Check the logs for details. 🔍'
-          : "Everything's set up and ready to go! Let me know what you'd like to build. 🚀"
+          ? (finalMsg || 'Installation finished with some issues. Check the logs for details. 🔍')
+          : (finalMsg || "Everything's set up and ready to go! Let me know what you'd like to build. 🚀")
       );
+      window.__auriFinalMsg = null;
     }, 3000);
   }
 

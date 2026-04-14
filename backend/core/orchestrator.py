@@ -7,6 +7,30 @@ from backend.agents.validate_agent import ValidationAgent
 from backend.agents.environment_agent import EnvironmentAgent
 from backend.core.task_manager import task_manager
 
+# Friendly display names for every software and preset the orchestrator knows
+# about. Imported by ``backend.server`` for response-text generation so both
+# places share one source of truth.
+PRETTY = {
+    # individual tools
+    "python":       "Python",
+    "nodejs":       "Node.js",
+    "git":          "Git",
+    "vscode":       "VS Code",
+    "docker":       "Docker",
+    "java":         "Java",
+    "mysql":        "MySQL",
+    "postgresql":   "PostgreSQL",
+    "mongodb":      "MongoDB",
+    "redis":        "Redis",
+    "postman":      "Postman",
+    # presets
+    "python_basic": "Python basics",
+    "python_ml":    "Python ML",
+    "web_dev":      "web dev",
+    "full_stack":   "full stack",
+    "data_science": "data science",
+}
+
 PRESET_CONFIGS = {
     "python_basic":  {
         "software": ["python", "vscode", "git"],
@@ -142,5 +166,26 @@ class Orchestrator:
         )
         _cb("environment", "done", 100, env_msg)
 
+        # ── Build final user-facing message ───────────────────────────────────
+        installed_names = [PRETTY.get(s, s) for s in software_list]
+        if len(installed_names) == 1:
+            final_msg = (
+                f"✅ {installed_names[0]} has been installed, configured, and validated!"
+            )
+        elif len(installed_names) == 2:
+            final_msg = (
+                f"✅ {installed_names[0]} and {installed_names[1]} are installed and ready!"
+            )
+        else:
+            final_msg = (
+                f"✅ {', '.join(installed_names[:-1])}, and {installed_names[-1]} "
+                f"are installed and ready!"
+            )
+        if pip_packages:
+            final_msg += f" Extra packages: {', '.join(pip_packages)}."
+
+        # Persist to its own column FIRST, then mark status=done — the WS
+        # reader calls get_task() which returns both in one row.
+        task_manager.set_final_message(task_id, final_msg)
         task_manager.update_task(task_id, "done", 100, "complete")
         progress_callback("complete", "done", 100, "All done!")

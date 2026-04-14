@@ -93,7 +93,7 @@ class ConfigureAgent(BaseAgent):
 
             return True, None
         except ImportError:
-            self.logger.warning("[ACT] winreg not available (non-Windows host), skipping PATH update.")
+            self.logger.info("[ACT] Skipping PATH update on non-Windows host.")
             return False, "winreg unavailable"
         except Exception as exc:
             self.logger.error("[ACT] PATH update failed: %s", exc)

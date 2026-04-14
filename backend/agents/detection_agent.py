@@ -1,16 +1,23 @@
-"""DetectionAgent — checks which software is installed on the Windows host."""
+"""DetectionAgent — checks which software is installed on the host.
+
+Cross-platform: probes are done via ``shutil.which`` followed by a version
+call. Admin status and free disk come from ``backend.utils`` helpers so the
+same code works on Windows (real install target) and Linux (Docker demo).
+"""
 
 from __future__ import annotations
 
-import ctypes
 import os
 import shutil
 import subprocess
 from typing import Any, Dict
 
 from backend.agents.base_agent import BaseAgent
+from backend.utils.admin_check import is_admin as _platform_is_admin
+from backend.utils.platform_utils import free_disk_gb as _platform_free_disk_gb
+from backend.utils.platform_utils import is_windows
 
-# Commands used to probe each tool.  A zero exit-code means installed.
+# Commands used to probe each tool. A zero exit-code means installed.
 _PROBE_COMMANDS: Dict[str, list[str]] = {
     "python":     ["python", "--version"],
     "nodejs":     ["node", "--version"],
@@ -24,7 +31,8 @@ _PROBE_COMMANDS: Dict[str, list[str]] = {
     "redis":      ["redis-server", "--version"],
 }
 
-# Postman is detected by its executable path rather than a CLI command.
+# Postman on Windows lives under %LOCALAPPDATA%\Programs\Postman\Postman.exe.
+# On non-Windows hosts we fall back to ``shutil.which("postman")``.
 _POSTMAN_PATH = os.path.join(
     os.environ.get("LOCALAPPDATA", ""),
     "Programs", "Postman", "Postman.exe",
@@ -33,6 +41,8 @@ _POSTMAN_PATH = os.path.join(
 
 def _probe(cmd: list[str]) -> bool:
     """Return True if *cmd* exits with code 0 (tool is on PATH)."""
+    if shutil.which(cmd[0]) is None:
+        return False
     try:
         result = subprocess.run(
             cmd,
@@ -54,7 +64,7 @@ class DetectionAgent(BaseAgent):
 
     def reason(self, context: Dict[str, Any]) -> str:
         thought = (
-            "Scanning PATH for CLI tools and checking Postman.exe path. "
+            "Scanning PATH for CLI tools and checking Postman. "
             "Will also query admin status and free disk space."
         )
         self.logger.debug("[REASON] %s", thought)
@@ -69,26 +79,21 @@ class DetectionAgent(BaseAgent):
             installed[name] = result
             self.logger.debug("  %-12s → %s", name, result)
 
-        # Postman — file-system check
-        installed["postman"] = os.path.isfile(_POSTMAN_PATH)
+        # python3 also counts as python on Linux
+        if not installed["python"] and shutil.which("python3") is not None:
+            installed["python"] = True
+
+        # Postman — file-system check on Windows, PATH lookup elsewhere
+        if is_windows():
+            installed["postman"] = os.path.isfile(_POSTMAN_PATH)
+        else:
+            installed["postman"] = shutil.which("postman") is not None
         self.logger.debug("  %-12s → %s", "postman", installed["postman"])
-
-        # Admin check
-        try:
-            is_admin = bool(ctypes.windll.shell32.IsUserAnAdmin())
-        except Exception:
-            is_admin = False
-
-        # Free disk on C:
-        try:
-            free_disk_gb = shutil.disk_usage("C:/").free / (1024 ** 3)
-        except Exception:
-            free_disk_gb = 0.0
 
         return {
             "installed": installed,
-            "is_admin": is_admin,
-            "free_disk_gb": round(free_disk_gb, 2),
+            "is_admin": _platform_is_admin(),
+            "free_disk_gb": _platform_free_disk_gb(),
         }
 
     def observe(self, result: Dict[str, Any]) -> Dict[str, Any]:
