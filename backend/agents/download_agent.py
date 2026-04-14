@@ -2,6 +2,7 @@ import os
 import time
 import requests
 from backend.agents.base_agent import BaseAgent
+from backend.utils.platform_utils import is_simulated_host
 
 BASE_URL = (
     "https://github.com/MAR9775/AuriOS-Software-Repository"
@@ -30,6 +31,22 @@ class DownloadAgent(BaseAgent):
         filename = FILENAME_MAP.get(software_name.lower())
         if not filename:
             raise ValueError(f"Unknown software: {software_name}")
+
+        # ── Simulated download (non-Windows Docker host) ────────────────────
+        # Windows .exe/.msi installers can't run inside a Linux container, so
+        # instead of hitting the network we synthesize a stub file and tick
+        # progress up to 100% so the UI flow exercises the full pipeline.
+        if is_simulated_host():
+            sim_dir = "/tmp/auri-simulated"
+            os.makedirs(sim_dir, exist_ok=True)
+            stub_path = os.path.join(sim_dir, f"{filename}.stub")
+            with open(stub_path, "w") as f:
+                f.write("simulated installer")
+            for pct in (10, 30, 60, 90, 100):
+                time.sleep(0.3)
+                if progress_callback:
+                    progress_callback(pct)
+            return stub_path
 
         url = BASE_URL + filename
         os.makedirs("installers", exist_ok=True)

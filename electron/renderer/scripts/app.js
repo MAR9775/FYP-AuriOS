@@ -370,6 +370,10 @@ function connectProgressSocket(taskId) {
       if (window.progressPanel && typeof window.progressPanel.updateStep === 'function') {
         window.progressPanel.updateStep(data);
       }
+      // Stash the backend's final message so progress-panel can render it
+      if (data.final_message) {
+        window.__auriFinalMsg = data.final_message;
+      }
     } catch (_) {}
   };
 

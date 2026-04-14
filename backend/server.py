@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import platform
 import shutil
 from contextlib import asynccontextmanager
@@ -16,12 +17,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend.agents.detection_agent import DetectionAgent
-from backend.agents.download_agent import DownloadAgent
-from backend.agents.install_agent import InstallAgent
-from backend.core.orchestrator import Orchestrator
+from backend.core.orchestrator import Orchestrator, PRETTY
 from backend.core.task_manager import task_manager
 from backend.llm.intent_parser import parse_intent
 from backend.utils.admin_check import is_admin
+from backend.utils.platform_utils import free_disk_gb, is_windows
 
 # ---------------------------------------------------------------------------
 # Task infrastructure
@@ -71,8 +71,10 @@ class _RowFactoryDB:
         self._conn: Optional[aiosqlite.Connection] = None
 
     async def __aenter__(self) -> aiosqlite.Connection:
-        self._conn = await aiosqlite.connect(self._path)
+        self._conn = await aiosqlite.connect(self._path, timeout=30)
         self._conn.row_factory = aiosqlite.Row
+        await self._conn.execute("PRAGMA journal_mode=WAL")
+        await self._conn.execute("PRAGMA busy_timeout=30000")
         return self._conn
 
     async def __aexit__(self, *args: Any) -> None:
@@ -92,7 +94,9 @@ def get_db() -> _RowFactoryDB:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Ensure required tables exist before serving requests."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30) as db:
+        await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA busy_timeout=30000")
         await db.execute(
             """
             CREATE TABLE IF NOT EXISTS conversations (
@@ -153,7 +157,13 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 async def run_orchestrator_background(preset: str, task_id: str):
-    """Run full preset installation pipeline in background."""
+    """Run full preset installation pipeline in background.
+
+    The orchestrator handles both named presets (python_basic, full_stack, …)
+    and raw software names (git, docker, …) — the single-software case is
+    covered by a fallback in ``Orchestrator.run`` which synthesizes a
+    ``{"software": [preset], "pip_packages": []}`` config.
+    """
     try:
         orchestrator = Orchestrator()
         await orchestrator.run(
@@ -173,37 +183,11 @@ async def run_orchestrator_background(preset: str, task_id: str):
         task_manager.update_task(task_id, "failed", 0, str(e))
 
 
-async def run_single_software_background(software: str, task_id: str):
-    """Download and install a single software in background."""
-    try:
-        task_manager.update_task(task_id, "running", 0, f"Starting {software}")
-
-        # Step 1: Download
-        task_manager.update_task(task_id, "running", 10, f"download_{software}")
-        downloader = DownloadAgent()
-
-        def on_progress(pct):
-            task_manager.update_task(task_id, "running", int(pct * 0.7), f"download_{software}")
-
-        filepath = await asyncio.to_thread(downloader.download, software, on_progress)
-
-        # Step 2: Install
-        task_manager.update_task(task_id, "running", 75, f"install_{software}")
-        installer = InstallAgent()
-        result = await asyncio.to_thread(installer.install, filepath)
-
-        if result["success"]:
-            task_manager.update_task(task_id, "done", 100, "complete")
-            async with get_db() as db:
-                await db.execute(
-                    "INSERT INTO installation_history (preset_name, status) VALUES (?, ?)",
-                    (software, "success")
-                )
-                await db.commit()
-        else:
-            task_manager.update_task(task_id, "failed", 75, result["error"])
-    except Exception as e:
-        task_manager.update_task(task_id, "failed", 0, str(e))
+_INSTALL_INTENTS = {
+    "python_basic", "python_ml", "web_dev",
+    "full_stack", "data_science", "java",
+    "single_software",
+}
 
 
 @app.post("/chat")
@@ -228,11 +212,8 @@ async def chat(request: ChatRequest):
         # Just respond with clarifying question, no install
         pass
 
-    elif result["intent"] in [
-        "python_basic", "python_ml", "web_dev",
-        "full_stack", "data_science", "java"
-    ]:
-        # Check admin before starting
+    elif result["intent"] in _INSTALL_INTENTS:
+        # Admin check: on non-Windows this is always True, so Docker works.
         if not is_admin():
             response_text = (
                 "AuriOS needs administrator privileges to install software. "
@@ -240,39 +221,35 @@ async def chat(request: ChatRequest):
                 "Right-click AuriOS → Run as Administrator 🔐"
             )
         else:
-            # Check disk space
-            free_gb = shutil.disk_usage("C:/").free / (1024 ** 3)
-            if free_gb < 1.0:
+            # Disk space check (cross-platform).
+            free_gb = free_disk_gb()
+            if free_gb and free_gb < 1.0:
                 response_text = (
-                    f"Heads up! You only have {free_gb:.1f}GB free. "
+                    f"Heads up! You only have {free_gb}GB free. "
                     f"Installation needs at least 1GB. Free up some space first! 💾"
                 )
             else:
-                # Use the intent name as preset key (matches PRESET_CONFIGS keys)
-                preset = result["intent"]
-                response_text = (
-                    f"Got it! Starting {preset} setup now. "
-                    f"Watch the progress panel on the right! 🚀"
-                )
-                # Create task and start orchestrator in background
-                task_id = task_manager.create_task(preset)
-                asyncio.create_task(
-                    run_orchestrator_background(preset, task_id)
-                )
+                # Unify preset + single_software: for single_software we use the
+                # specific tool name as the preset key — Orchestrator falls back
+                # to a synthesized single-software config.
+                if result["intent"] == "single_software":
+                    preset_key = result.get("preset_or_software") or "unknown"
+                else:
+                    preset_key = result["intent"]
 
-    elif result["intent"] == "single_software":
-        software = result["preset_or_software"]
-        if not is_admin():
-            response_text = (
-                "Need admin privileges to install. "
-                "Please restart as Administrator 🔐"
-            )
-        else:
-            task_id = task_manager.create_task(software)
-            asyncio.create_task(
-                run_single_software_background(software, task_id)
-            )
-            response_text = f"Installing {software} for you now! 🚀"
+                # Keep the LLM's confirmation text if it has one; otherwise
+                # fall back to a canned message using the pretty label.
+                label = PRETTY.get(preset_key, preset_key)
+                if not response_text or response_text.strip() == "":
+                    response_text = (
+                        f"Got it! Starting {label} setup now. "
+                        f"Watch the progress panel on the right! 🚀"
+                    )
+
+                task_id = task_manager.create_task(preset_key)
+                asyncio.create_task(
+                    run_orchestrator_background(preset_key, task_id)
+                )
 
     # Save assistant response
     async with get_db() as db:
@@ -308,7 +285,6 @@ async def system_status() -> Dict[str, Any]:
     disk = shutil.disk_usage(BASE_DIR)
 
     # Run DetectionAgent in a thread so we don't block the event loop
-    import asyncio
     detection = await asyncio.get_event_loop().run_in_executor(
         None, lambda: DetectionAgent().run({})
     )
@@ -411,13 +387,11 @@ async def clear_history() -> dict:
 @app.get("/system-status-full")
 async def system_status_full() -> Dict[str, Any]:
     """Return Ollama connectivity, admin status, free disk space, and installed software."""
-    import ctypes
     import subprocess
     import urllib.request as _ureq
 
     # ── Ollama connectivity ───────────────────────────────────────────────────
-    import os as _os
-    _ollama_url = _os.getenv("OLLAMA_URL", "http://localhost:11434")
+    _ollama_url = os.getenv("OLLAMA_URL", "http://localhost:11434")
     ollama_connected = False
     try:
         with _ureq.urlopen(_ollama_url, timeout=2) as _r:
@@ -425,26 +399,13 @@ async def system_status_full() -> Dict[str, Any]:
     except Exception:
         ollama_connected = False
 
-    # ── Admin privileges (Windows only) ──────────────────────────────────────
-    is_admin = False
-    try:
-        is_admin = bool(ctypes.windll.shell32.IsUserAnAdmin())
-    except Exception:
-        is_admin = False
+    # ── Admin privileges (platform-aware) ────────────────────────────────────
+    admin_status = is_admin()
 
-    # ── Free disk space ───────────────────────────────────────────────────────
-    free_disk_gb = 0.0
-    try:
-        _usage = shutil.disk_usage("C:/")
-        free_disk_gb = round(_usage.free / (1024 ** 3), 1)
-    except Exception:
-        try:
-            _usage = shutil.disk_usage("/")
-            free_disk_gb = round(_usage.free / (1024 ** 3), 1)
-        except Exception:
-            free_disk_gb = 0.0
+    # ── Free disk space (platform-aware) ─────────────────────────────────────
+    free_gb = free_disk_gb()
 
-    # ── Software detection via subprocess ────────────────────────────────────
+    # ── Software detection via subprocess (cross-platform) ───────────────────
     _SW_CMDS: Dict[str, list] = {
         "python": ["python",  "--version"],
         "git":    ["git",     "--version"],
@@ -454,9 +415,11 @@ async def system_status_full() -> Dict[str, Any]:
         "docker": ["docker",  "--version"],
         "java":   ["java",    "-version"],
     }
-    _no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    _no_window = getattr(subprocess, "CREATE_NO_WINDOW", 0) if is_windows() else 0
 
     async def _check(cmd: list) -> bool:
+        if shutil.which(cmd[0]) is None:
+            return False
         try:
             r = await asyncio.get_running_loop().run_in_executor(
                 None,
@@ -474,11 +437,14 @@ async def system_status_full() -> Dict[str, Any]:
     installed: Dict[str, bool] = {}
     for _name, _cmd in _SW_CMDS.items():
         installed[_name] = await _check(_cmd)
+    # python3 also counts as python on Linux
+    if not installed["python"] and shutil.which("python3") is not None:
+        installed["python"] = True
 
     return {
         "ollama_connected": ollama_connected,
-        "is_admin":         is_admin,
-        "free_disk_gb":     free_disk_gb,
+        "is_admin":         admin_status,
+        "free_disk_gb":     free_gb,
         "installed":        installed,
     }
 
@@ -520,12 +486,24 @@ async def progress_websocket(websocket: WebSocket, task_id: str):
             # Only send if something changed
             current_status = (task["status"], task["progress"], task["current_step"])
             if current_status != last_status:
-                await websocket.send_json({
+                payload: Dict[str, Any] = {
                     "step":     task["current_step"],
                     "status":   task["status"],
                     "progress": task["progress"],
-                    "message":  f"{task['current_step']} — {task['status']}"
-                })
+                    "message":  f"{task['current_step']} — {task['status']}",
+                }
+                if task["status"] == "done":
+                    fm = task.get("final_message")
+                    if fm:
+                        payload["final_message"] = fm
+                elif task["status"] == "failed":
+                    payload["final_message"] = (
+                        f"⚠️ Installation failed: "
+                        f"{task.get('current_step', 'unknown error')}"
+                    )
+                elif task["status"] == "cancelled":
+                    payload["final_message"] = "Installation cancelled."
+                await websocket.send_json(payload)
                 last_status = current_status
 
             if task["status"] in ["done", "cancelled", "failed"]:
