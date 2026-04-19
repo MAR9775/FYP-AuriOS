@@ -143,13 +143,15 @@
     const mapped = STATUS_MAP[status] || 'pending';
 
     // ── Enforce sequential order ────────────────────────────────────────────
-    // If this step is now active, forcefully complete all preceding steps.
-    if (mapped === 'in_progress') {
+    // If this step is now active, done, or failed, forcefully complete all preceding steps.
+    if (['in_progress', 'done', 'failed'].includes(mapped)) {
       const idx = _steps.findIndex(s => s.id === step);
       if (idx > 0) {
         for (let i = 0; i < idx; i++) {
           const prevId = _steps[i].id;
           if (_stepStates[prevId] !== 'done' && _stepStates[prevId] !== 'failed') {
+            _stepStates[prevId] = 'done';
+            _stepProgress[prevId] = 100;
             _applyStepState(prevId, 'done', 100, null);
           }
         }

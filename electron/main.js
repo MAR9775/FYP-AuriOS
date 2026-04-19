@@ -132,8 +132,8 @@ async function createWindow() {
     return net.fetch('file://' + filePath);
   });
 
-  // Always show the splash screen first — it will IPC us when ready.
-  mainWindow.loadURL('app://app/splash.html');
+  // Always load the single-page application entry point
+  mainWindow.loadURL('app://app/index.html');
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -211,14 +211,6 @@ ipcMain.on('window-maximize', () => {
 ipcMain.on('window-close', () => mainWindow && mainWindow.hide());
 ipcMain.on('set-title', (_, title) => {
   if (mainWindow) mainWindow.setTitle(title);
-});
-
-// Splash complete — load the appropriate main page
-ipcMain.on('splash-complete', async () => {
-  if (!mainWindow) return;
-  const { onboarded } = await loadPrefs();
-  const startPage = onboarded ? 'index.html' : 'onboarding.html';
-  mainWindow.loadURL(`app://app/${startPage}`);
 });
 
 // Request elevation — relaunches the app with RunAs (UAC prompt)

@@ -151,16 +151,49 @@ class Orchestrator:
             task_manager.update_task(task_id, task_status, pct, f"{step}:{status}")
             progress_callback(step, status, pct, msg)
 
-        # ── Stage 1: Detection ────────────────────────────────────────────────
-        _cb("detection", "running", 5, "Scanning installed software…")
+        # ── Stage 1: Detection & System Specs ─────────────────────────────────
+        _cb("detection", "running", 5, "Scanning installed software and verifying system specs…")
         detection_result = await asyncio.to_thread(DetectionAgent().run, {})
         installed = detection_result.get("installed", {})
-        to_install = [s for s in software_list if not installed.get(s, False)]
+        free_gb = detection_result.get("free_disk_gb", 0)
+        is_admin = detection_result.get("is_admin", False)
+        
+        to_install = []
+        failed_installs = []
+        
+        from backend.utils import repo_sync
+        from backend.utils.platform_utils import is_windows
+        
+        for software in software_list:
+            if installed.get(software, False):
+                continue
+                
+            info = repo_sync.get_download_info(software)
+            if not info:
+                failed_installs.append(software)
+                continue
+                
+            required_gb = info.get("size_mb", 0) / 1024.0
+            if is_windows() and not is_admin:
+                failed_installs.append(software)
+                continue
+                
+            if free_gb < required_gb:
+                failed_installs.append(software)
+                continue
+                
+            to_install.append(software)
+
+        if failed_installs:
+            _cb("detection", "failed", 15, f"Validation failed for: {failed_installs}")
+            task_manager.set_final_message(task_id, f"⚠️ Pre-install validation failed for {', '.join(failed_installs)}")
+            return
+            
         _cb("detection", "done", 15, f"Need to install: {to_install if to_install else 'nothing — all present'}")
 
         # ── Stage 2: Download ─────────────────────────────────────────────────
         downloader = DownloadAgent()
-        installer_paths = {}   # software_name → local filepath
+        installer_paths = {}
 
         if to_install:
             _cb("download", "running", 20, f"Downloading {to_install}…")
@@ -181,7 +214,9 @@ class Orchestrator:
                     )
                     installer_paths[software] = filepath
                 except Exception as e:
-                    _cb("download", "running", base_pct, f"{software}: download failed — {e}")
+                    _cb("download", "failed", base_pct, f"{software}: download failed — {e}")
+                    task_manager.set_final_message(task_id, f"⚠️ Download failed for {software}: {e}")
+                    return
 
             _cb("download", "done", 40, "Downloads complete.")
         else:
@@ -192,7 +227,6 @@ class Orchestrator:
             _cb("install", "running", 42, f"Installing {list(installer_paths)}…")
             total_installs = len(installer_paths)
             inst_agent = InstallAgent()
-            failed_installs = []
 
             for i, (software, filepath) in enumerate(installer_paths.items()):
                 pct = 42 + int((i / total_installs) * 18)
@@ -202,23 +236,19 @@ class Orchestrator:
                     _cb("install", "running", pct + int(18 / total_installs),
                         f"{software} installed ✓")
                 else:
-                    _cb("install", "running", pct, f"{software} failed: {result['error']}")
-                    failed_installs.append(software)
-
-            if failed_installs:
-                _cb("install", "failed", 60, f"Installation failed for: {failed_installs}")
-                task_manager.set_final_message(task_id, f"⚠️ Installation failed for {', '.join(failed_installs)}")
-                task_manager.update_task(task_id, "failed", 60, "failed")
-                return
+                    _cb("install", "failed", pct, f"{software} failed: {result['error']}")
+                    task_manager.set_final_message(task_id, f"⚠️ Installation failed for {software}")
+                    return
 
             _cb("install", "done", 60, "Installation complete.")
         else:
             _cb("install", "done", 60, "Nothing to install.")
 
+
         # ── Stage 4: Configure ────────────────────────────────────────────────
         _cb("configure", "running", 62, f"Configuring PATH and pip packages {pip_packages}…")
         configure_result = await asyncio.to_thread(
-            ConfigureAgent().run, {"pip_packages": pip_packages}
+            ConfigureAgent().run, {"pip_packages": pip_packages, "software_list": software_list}
         )
         pip_ok = [k for k, v in configure_result.get("pip_results", {}).items() if v.get("success")]
         pip_fail = [k for k, v in configure_result.get("pip_results", {}).items() if not v.get("success")]
@@ -277,7 +307,7 @@ class Orchestrator:
             final_msg += f" Extra packages: {', '.join(pip_packages)}."
 
         # ── Stage 7: Launch installed apps ───────────────────────────────────
-        launchable = [s for s in software_list if s in _LAUNCH_EXE]
+        launchable = [s for s in software_list if s in _LAUNCH_STATIC]
         if launchable:
             _cb("launch", "running", 100, f"Opening {launchable}…")
             for sw in launchable:

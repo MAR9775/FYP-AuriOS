@@ -10,8 +10,119 @@
   <link rel="stylesheet" href="styles/agent.css" />
   <link rel="stylesheet" href="styles/components.css" />
   <link rel="stylesheet" href="styles/progress-panel.css" />
+  <link rel="stylesheet" href="styles/splash.css" />
+  <link rel="stylesheet" href="styles/onboarding.css" />
 </head>
 <body>
+<div id="splash-overlay">
+<div class="splash-container">
+    <div class="parallax-scene">
+      <img src="assets/abstract_core.png" class="core-layer" alt="Abstract Core" />
+      <div class="light-scan"></div>
+      <div class="ui-layer">
+        <!-- Abstract HUD structural lines forming over the scene -->
+        <svg class="ui-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <path class="ui-line" d="M 0 60 L 15 60 L 25 45 L 75 45 L 85 60 L 100 60" />
+          <path class="ui-line" d="M 15 60 L 15 70" />
+          <path class="ui-line" d="M 85 60 L 85 70" />
+          <circle class="ui-node" cx="15" cy="60" r="0.4" />
+          <circle class="ui-node" cx="25" cy="45" r="0.4" />
+          <circle class="ui-node" cx="75" cy="45" r="0.4" />
+          <circle class="ui-node" cx="85" cy="60" r="0.4" />
+        </svg>
+      </div>
+    </div>
+    
+    <div class="splash-vignette"></div>
+
+    <div class="splash-foreground-content">
+      <div class="splash-logo-block">
+        <div class="splash-logo-name">AuriOS</div>
+        <div class="splash-logo-sub">System Initialization</div>
+      </div>
+
+      <div class="splash-status-line" id="splash-status-line">Starting up…</div>
+
+      <div class="splash-progress-wrap">
+        <div class="splash-progress-track">
+          <div class="splash-progress-fill" id="splash-progress-fill"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  
+</div>
+<div id="onboarding-view" class="hidden" style="transition: opacity 0.5s ease">
+<div class="ob-wrapper">
+    <div class="ob-card">
+
+      <h1 class="ob-header">◈ Welcome to AuriOS ◈</h1>
+      <p class="ob-subtitle">Your intelligent development assistant</p>
+
+      <!-- Section 1: Name -->
+      <div class="ob-section">
+        <label class="ob-label" for="name-input">What should I call you?</label>
+        <input type="text" id="name-input" class="ob-input"
+               placeholder="Enter your name..." autocomplete="off" />
+        <span id="name-error" class="ob-error hidden">Name is required</span>
+      </div>
+
+      <!-- Section 2: Experience -->
+      <div class="ob-section">
+        <label class="ob-label">What's your experience level?</label>
+        <div class="ob-radio-group">
+          <label class="ob-radio">
+            <input type="radio" name="experience" value="beginner" />
+            <span>Complete Beginner</span>
+          </label>
+          <label class="ob-radio">
+            <input type="radio" name="experience" value="some" />
+            <span>Some Experience</span>
+          </label>
+          <label class="ob-radio">
+            <input type="radio" name="experience" value="intermediate" />
+            <span>Intermediate Developer</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Section 3: Interests -->
+      <div class="ob-section">
+        <label class="ob-label">What will you mainly work on?</label>
+        <div class="ob-checkbox-group">
+          <label class="ob-checkbox">
+            <input type="checkbox" value="python_ai_ml" />
+            <span>Python / AI / ML</span>
+          </label>
+          <label class="ob-checkbox">
+            <input type="checkbox" value="web_dev" />
+            <span>Web Development</span>
+          </label>
+          <label class="ob-checkbox">
+            <input type="checkbox" value="data_science" />
+            <span>Data Science</span>
+          </label>
+          <label class="ob-checkbox">
+            <input type="checkbox" value="full_stack" />
+            <span>Full Stack</span>
+          </label>
+          <label class="ob-checkbox">
+            <input type="checkbox" value="exploring" />
+            <span>Just exploring</span>
+          </label>
+        </div>
+      </div>
+
+      <button id="start-btn" class="ob-start-btn">Get Started →</button>
+
+    </div>
+  </div>
+
+  
+</div>
+<div id="app-view" class="hidden" style="width:100%; height:100%; display:flex; flex-direction:column;">
+
 
   <!-- ── Backend offline banner ──────────────────────────────────────── -->
   <div id="backend-banner" class="backend-banner hidden">
@@ -199,7 +310,9 @@
   </div>
 
   <!-- ── Scripts ───────────────────────────────────────────────────────── -->
-  <script src="scripts/web-api.js"></script>
+  
+</div>
+<script src="scripts/web-api.js"></script>
   <script src="scripts/agent-animation.js"></script>
   <script src="scripts/profile.js"></script>
   <script src="scripts/progress-panel.js"></script>
@@ -207,5 +320,7 @@
   <script src="scripts/tts.js"></script>
   <script src="scripts/app.js"></script>
 
+  <script src="scripts/onboarding.js"></script>
+  <script src="scripts/splash.js"></script>
 </body>
 </html>

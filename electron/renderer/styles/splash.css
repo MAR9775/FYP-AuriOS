@@ -1,0 +1,236 @@
+/* splash.css */
+#splash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #050508;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 60px;
+  overflow: hidden;
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#splash-overlay.fade-out {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+/* Base fade in for the whole window */
+body {
+  opacity: 0;
+  animation: naturalFadeIn 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+@keyframes naturalFadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ── Cinematic Parallax & Robot ─────────────────────────────────────── */
+.parallax-scene {
+  position: absolute;
+  inset: -5%; /* Overbleed for scaling */
+  z-index: 1;
+  animation: slowPushIn 15s cubic-bezier(0.33, 1, 0.68, 1) forwards;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@keyframes slowPushIn {
+  0% { transform: scale(1.0); }
+  100% { transform: scale(1.06); }
+}
+
+.core-layer {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.85; /* Soften the image slightly into the dark matte background */
+  mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 90%);
+  -webkit-mask-image: radial-gradient(ellipse at center, rgba(0,0,0,1) 40%, rgba(0,0,0,0) 90%);
+  animation: corePulse 12s ease-in-out infinite alternate;
+  transform-origin: center center;
+}
+
+/* Subtle pulsing for the abstract core: ultra-slow rotation and micro-scale */
+@keyframes corePulse {
+  0% { transform: rotate(0deg) scale(1); }
+  100% { transform: rotate(1deg) scale(1.015); }
+}
+
+/* ── Horizontal Light Scan ──────────────────────────────────────────── */
+.light-scan {
+  position: absolute;
+  top: -20%;
+  left: 0;
+  width: 100%;
+  height: 20%;
+  background: linear-gradient(to bottom, rgba(167, 139, 250, 0) 0%, rgba(139, 92, 246, 0.08) 50%, rgba(99, 102, 241, 0.2) 80%, rgba(99, 102, 241, 0) 100%);
+  animation: scanSweep 8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes scanSweep {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(700%); opacity: 0; }
+}
+
+/* ── Minimal Structured Interface Elements ──────────────────────────── */
+.ui-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.ui-svg {
+  width: 100%;
+  height: 100%;
+  stroke: rgba(167, 139, 250, 0.3);
+  stroke-width: 1.5;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.ui-line {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: drawLine 4s cubic-bezier(0.22, 1, 0.36, 1) 0.5s forwards;
+}
+
+.ui-node {
+  fill: rgba(167, 139, 250, 0.6);
+  opacity: 0;
+  animation: revealNode 0.8s ease 2s forwards;
+}
+.ui-node:nth-child(2) { animation-delay: 1.8s; }
+.ui-node:nth-child(3) { animation-delay: 2.2s; }
+.ui-node:nth-child(4) { animation-delay: 2.6s; }
+.ui-node:nth-child(5) { animation-delay: 3.0s; }
+
+@keyframes drawLine {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes revealNode {
+  to { opacity: 1; }
+}
+
+/* Background vignette to ground the bottom UI */
+.splash-vignette {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, #050508 0%, rgba(5,5,8,0.7) 20%, transparent 50%);
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* ── Foreground UI (Logo & Progress) ────────────────────────────────── */
+.splash-foreground-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+}
+
+.splash-logo-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.splash-logo-name {
+  font-size: 56px;
+  font-weight: 300;
+  letter-spacing: 0.15em;
+  color: #ffffff;
+  line-height: 1;
+  opacity: 0;
+  animation: splashLogoReveal 2.5s cubic-bezier(0.25, 1, 0.5, 1) 1s forwards;
+  position: relative;
+}
+
+/* Soft light sweep over the text */
+.splash-logo-name::after {
+  content: "AuriOS";
+  position: absolute;
+  left: 0; top: 0;
+  color: transparent;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  background-size: 200% 100%;
+  animation: splashTextLightSweep 4s ease-in-out 1.5s forwards;
+  opacity: 0;
+}
+
+@keyframes splashLogoReveal {
+  0% { opacity: 0; transform: translateY(10px); letter-spacing: 0.12em; }
+  100% { opacity: 1; transform: translateY(0); letter-spacing: 0.15em; }
+}
+@keyframes splashTextLightSweep {
+  0% { background-position: -100% 0; opacity: 1; }
+  100% { background-position: 200% 0; opacity: 0; }
+}
+
+.splash-logo-sub {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  opacity: 0;
+  animation: splashLogoReveal 2s cubic-bezier(0.25, 1, 0.5, 1) 1.8s forwards;
+}
+
+/* ── Progress & Status ──────────────────────────────────────────────── */
+.splash-status-line {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  height: 16px;
+  opacity: 0;
+  animation: splashFadeUp 1s ease 2.2s forwards;
+  transition: color 0.5s ease;
+}
+.splash-status-line.ready { color: rgba(167, 139, 250, 0.8); }
+
+.splash-progress-wrap {
+  width: 240px;
+  opacity: 0;
+  animation: splashFadeUp 1s ease 2.4s forwards;
+}
+
+.splash-progress-track {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  position: relative;
+}
+
+.splash-progress-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 0%;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+  transition: width 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes splashFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}

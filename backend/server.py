@@ -134,7 +134,8 @@ async def lifespan(app: FastAPI):
         )
         await db.commit()
 
-    repo_sync.startup_sync()
+    # Wait for catalog sync before starting to serve requests
+    await asyncio.to_thread(repo_sync.sync)
     yield
 
 

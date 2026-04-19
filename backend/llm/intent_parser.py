@@ -77,7 +77,7 @@ _INSTALL_VERBS = re.compile(
 
 # Presets are checked BEFORE single software because they're more specific.
 _PRESET_PATTERNS: list[tuple[re.Pattern, str]] = [
-    (re.compile(r"\bfull\s*stack\b|\beverything\b|\ball\s*tools?\b|\bcomplete\s*(dev|setup)\b", re.I), "full_stack"),
+    (re.compile(r"\bfull\s*stack\b|\ball\s*tools?\b|\bcomplete\s*(dev|setup)\b", re.I), "full_stack"),
     (re.compile(r"\bpython\b.*\b(ml|machine\s*learning|tensorflow|pytorch|ai)\b|\b(ml|ai)\b.*\bpython\b", re.I), "python_ml"),
     (re.compile(r"\bdata\s*science\b|\b(pandas|numpy|jupyter|matplotlib)\b", re.I), "data_science"),
     (re.compile(r"\b(web\s*dev|frontend|front[-\s]end|react|angular|vue)\b", re.I), "web_dev"),

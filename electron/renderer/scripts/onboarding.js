@@ -2,26 +2,7 @@
 
 const BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
 
-// Check if already onboarded — retry a few times to give the backend time to start
-(async () => {
-  for (let attempt = 0; attempt < 6; attempt++) {
-    try {
-      const res = await fetch(`${BASE}/preferences`);
-      if (res.ok) {
-        const list = await res.json();
-        const prefs = Object.fromEntries(list.map(p => [p.key, p.value]));
-        if (prefs.onboarded === 'true') {
-          window.location.href = 'index.html';
-          return;
-        }
-        break; // Got a valid response; not onboarded — show the form
-      }
-    } catch (_) {}
-    // Backend not ready yet — wait 600ms before next attempt
-    await new Promise(r => setTimeout(r, 600));
-  }
-})();
-
+// Initial state check is now handled by splash.js
 document.addEventListener('DOMContentLoaded', () => {
   const nameInput = document.getElementById('name-input');
   const nameError = document.getElementById('name-error');
@@ -78,7 +59,19 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ key: 'setup_date', value: new Date().toISOString() }),
       });
 
-      window.location.href = 'index.html';
+      // Initialize dashboard data if necessary, or just show app-view
+      document.getElementById('onboarding-view').style.opacity = '0';
+      setTimeout(() => {
+        document.getElementById('onboarding-view').classList.add('hidden');
+        document.getElementById('app-view').style.opacity = '0';
+        document.getElementById('app-view').classList.remove('hidden');
+        // trigger reflow
+        void document.getElementById('app-view').offsetWidth;
+        document.getElementById('app-view').style.transition = 'opacity 0.8s ease';
+        document.getElementById('app-view').style.opacity = '1';
+        // Reload app data
+        if (typeof window.initApp === 'function') window.initApp();
+      }, 500);
     } catch (err) {
       startBtn.disabled    = false;
       startBtn.textContent = 'Get Started →';

@@ -676,7 +676,7 @@ if (clearBtn) {
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-(async () => {
+window.initApp = async function() {
   const greetingEl    = document.querySelector('.greeting-text');
   const dashUsernameEl = document.getElementById('dash-username');
 
@@ -699,63 +699,14 @@ if (clearBtn) {
   }
 
   // ── Conversation bootstrap ─────────────────────────────────────────────────
-  let activeConv = conversationManager.getActive();
-
-  if (!activeConv) {
-    // Try to import backend history into first conversation
-    try {
-      const history = await window.api.getHistory();
-      if (Array.isArray(history) && history.length > 0) {
-        activeConv = conversationManager.create();
-        // Seed title from first user message
-        const firstUser = history.find(m => m.role === 'user');
-        if (firstUser) {
-          const convs = conversationManager.load();
-          const conv = convs.find(c => c.id === activeConv.id);
-          if (conv) {
-            conv.title = firstUser.content.length > 42
-              ? firstUser.content.slice(0, 42) + '…'
-              : firstUser.content;
-            conv.messages = history.map(m => ({
-              role: m.role,
-              content: m.content,
-              timestamp: m.timestamp,
-            }));
-            conversationManager.save(convs);
-          }
-        }
-        history.forEach(m => renderMessage(m.role, m.content, m.timestamp, true));
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-        // Populate recent items
-        history.filter(m => m.role === 'user').slice(-5).reverse().forEach(m => addRecentItem(m.content));
-        const lastAssist = [...history].reverse().find(m => m.role === 'assistant');
-        if (lastAssist) lastAuriReply = lastAssist.content;
-        showChat();
-      } else {
-        activeConv = conversationManager.create();
-        showDashboard();
-      }
-    } catch (_) {
-      activeConv = conversationManager.create();
-      showDashboard();
-    }
-  } else {
-    // Load from localStorage
-    if (activeConv.messages.length > 0) {
-      activeConv.messages.forEach(m => renderMessage(m.role, m.content, m.timestamp, true));
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-      activeConv.messages.filter(m => m.role === 'user').slice(-5).reverse().forEach(m => addRecentItem(m.content));
-      const lastAssist = [...activeConv.messages].reverse().find(m => m.role === 'assistant');
-      if (lastAssist) lastAuriReply = lastAssist.content;
-      showChat();
-    } else {
-      showDashboard();
-    }
-  }
-
+  // ALWAYS start on the dashboard (like ChatGPT "New Chat")
+  conversationManager.create();
+  if (messagesInner) messagesInner.innerHTML = '';
+  lastAuriReply = '';
+  showDashboard();
   renderSidebar();
 
   // Status bar — immediate then every 30 s
   updateStatusBar();
   setInterval(updateStatusBar, 30000);
-})();
+};

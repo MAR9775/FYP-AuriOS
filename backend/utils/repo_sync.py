@@ -184,19 +184,36 @@ def sync() -> Dict[str, Dict[str, Any]]:
 
     for release in releases:
         tag = release.get("tag_name", "")
+        release_name = release.get("name", "").strip()
         for asset in release.get("assets", []):
             name = asset.get("name", "")
             slug = _slug_from_filename(name)
+
+            if not slug and release_name:
+                first_word = release_name.split()[0]
+                slug = re.sub(r"[^a-z0-9]+", "", first_word.lower())
+
+            if not slug:
+                m = re.match(r"^([a-zA-Z0-9]+)", name)
+                if m:
+                    slug = m.group(1).lower()
+
             if slug and slug not in new_catalog:
                 new_catalog[slug] = {
                     "slug":         slug,
-                    "display_name": _DISPLAY_NAMES.get(slug, slug),
+                    "display_name": release_name if release_name else _DISPLAY_NAMES.get(slug, slug),
                     "filename":     name,
                     "url":          asset.get("browser_download_url", ""),
                     "version":      _extract_version(name, tag),
                     "size_mb":      round(asset.get("size", 0) / (1024 * 1024), 1),
                     "tag":          tag,
                 }
+
+    # The GitHub repository has a corrupted asset for VLC (it's an HTML page).
+    # Override it here to point to the official VideoLAN download link.
+    if "vlc" in new_catalog:
+        new_catalog["vlc"]["url"] = "https://get.videolan.org/vlc/3.0.20/win64/vlc-3.0.20-win64.exe"
+        new_catalog["vlc"]["filename"] = "vlc-3.0.20-win64.exe"
 
     # Merge with fallback so any slug missing from GitHub still works
     merged = dict(_FALLBACK_CATALOG)
@@ -225,8 +242,3 @@ def is_available(slug: str) -> bool:
 def get_download_info(slug: str) -> Optional[Dict[str, Any]]:
     """Return catalog entry for *slug*, or None if not in the repo."""
     return get_catalog().get(slug.lower())
-
-
-def startup_sync() -> None:
-    """Fire a background sync on app startup (non-blocking)."""
-    threading.Thread(target=sync, daemon=True, name="repo-sync").start()

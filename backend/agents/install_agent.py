@@ -17,6 +17,7 @@ CUSTOM_FLAGS = {
                                      "/NOCANCEL", "/SP-", "/CLOSEAPPLICATIONS"],
     "VSCodeSetup-x64-1.85.0.exe":  ["/VERYSILENT", "/MERGETASKS=!runcode,addcontextmenufiles,addcontextmenufolders,addtopath"],
     "node-v20.10.0-x64.msi":       ["/quiet", "/norestart"],
+    "vlc-3.0.20-win64.exe":        ["/S", "/L=1033"],
 }
 
 class InstallAgent(BaseAgent):
