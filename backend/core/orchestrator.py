@@ -1,4 +1,8 @@
 import asyncio
+import glob
+import os
+import subprocess
+
 from backend.agents.detection_agent import DetectionAgent
 from backend.agents.download_agent import DownloadAgent
 from backend.agents.install_agent import InstallAgent
@@ -6,6 +10,70 @@ from backend.agents.configure_agent import ConfigureAgent
 from backend.agents.validate_agent import ValidationAgent
 from backend.agents.environment_agent import EnvironmentAgent
 from backend.core.task_manager import task_manager
+from backend.utils.platform_utils import is_windows
+
+_LOCAL = os.environ.get("LOCALAPPDATA", "")
+_PROG  = r"C:\Program Files"
+_PROG86 = r"C:\Program Files (x86)"
+_HOME  = os.path.expanduser("~")
+
+# Executables to launch after a software is installed.
+# CLI-only tools (python, git, node, java…) are intentionally omitted.
+# Static paths per software (no glob — evaluated lazily in _launch_candidates).
+_LAUNCH_STATIC: dict[str, list[str]] = {
+    "vscode":    ["code"],
+    "postman":   [os.path.join(_LOCAL, "Programs", "Postman", "Postman.exe")],
+    "docker":    [os.path.join(_PROG, "Docker", "Docker", "Docker Desktop.exe")],
+    "vlc":       [
+        os.path.join(_PROG,   "VideoLAN", "VLC", "vlc.exe"),
+        os.path.join(_PROG86, "VideoLAN", "VLC", "vlc.exe"),
+    ],
+    "rufus":     [
+        os.path.join(_PROG,   "Rufus", "rufus.exe"),
+        os.path.join(_PROG86, "Rufus", "rufus.exe"),
+        os.path.join(_LOCAL,  "Programs", "Rufus", "rufus.exe"),
+    ],
+    "7zip":      [
+        os.path.join(_PROG,   "7-Zip", "7zFM.exe"),
+        os.path.join(_PROG86, "7-Zip", "7zFM.exe"),
+    ],
+    "notepadpp": [
+        os.path.join(_PROG,   "Notepad++", "notepad++.exe"),
+        os.path.join(_PROG86, "Notepad++", "notepad++.exe"),
+    ],
+    "mysql":     [
+        os.path.join(_PROG,   "MySQL", "MySQL Workbench 8.0", "MySQLWorkbench.exe"),
+        os.path.join(_PROG86, "MySQL", "MySQL Workbench 8.0", "MySQLWorkbench.exe"),
+    ],
+}
+
+
+def _launch_candidates(software: str) -> list[str]:
+    """Return all candidate exe paths for *software*, including portable globs."""
+    paths = list(_LAUNCH_STATIC.get(software, []))
+    if software == "rufus":
+        # Rufus is often a portable exe — scan at call-time so we catch it
+        # even if it was downloaded after the server started.
+        paths += glob.glob(os.path.join(_HOME, "Downloads", "rufus*.exe"))
+        paths += glob.glob(os.path.join(_HOME, "Desktop",   "rufus*.exe"))
+    return paths
+
+
+def _launch(software: str) -> None:
+    """Try to open the GUI for *software* after installation. Best-effort."""
+    if not is_windows():
+        return
+    import shutil as _shutil
+    for exe in _launch_candidates(software):
+        if not exe:
+            continue
+        if os.path.sep not in exe:
+            if _shutil.which(exe):
+                subprocess.Popen([exe], creationflags=subprocess.DETACHED_PROCESS)
+                return
+        elif os.path.isfile(exe):
+            subprocess.Popen([exe], creationflags=subprocess.DETACHED_PROCESS)
+            return
 
 # Friendly display names for every software and preset the orchestrator knows
 # about. Imported by ``backend.server`` for response-text generation so both
@@ -71,7 +139,16 @@ class Orchestrator:
         pip_packages = config["pip_packages"]
 
         def _cb(step: str, status: str, pct: int, msg: str):
-            task_manager.update_task(task_id, status, pct, step)
+            # Overall task status stays "running" for intermediate steps so the
+            # WebSocket doesn't close prematurely on individual step completion.
+            if status in ("failed", "cancelled"):
+                task_status = status
+            elif step == "complete":
+                task_status = "done"
+            else:
+                task_status = "running"
+            # Encode "step:step_status" so the WS can report per-step state.
+            task_manager.update_task(task_id, task_status, pct, f"{step}:{status}")
             progress_callback(step, status, pct, msg)
 
         # ── Stage 1: Detection ────────────────────────────────────────────────
@@ -115,6 +192,7 @@ class Orchestrator:
             _cb("install", "running", 42, f"Installing {list(installer_paths)}…")
             total_installs = len(installer_paths)
             inst_agent = InstallAgent()
+            failed_installs = []
 
             for i, (software, filepath) in enumerate(installer_paths.items()):
                 pct = 42 + int((i / total_installs) * 18)
@@ -125,6 +203,13 @@ class Orchestrator:
                         f"{software} installed ✓")
                 else:
                     _cb("install", "running", pct, f"{software} failed: {result['error']}")
+                    failed_installs.append(software)
+
+            if failed_installs:
+                _cb("install", "failed", 60, f"Installation failed for: {failed_installs}")
+                task_manager.set_final_message(task_id, f"⚠️ Installation failed for {', '.join(failed_installs)}")
+                task_manager.update_task(task_id, "failed", 60, "failed")
+                return
 
             _cb("install", "done", 60, "Installation complete.")
         else:
@@ -154,7 +239,14 @@ class Orchestrator:
         passed = [k for k, v in validation.items() if v]
         failed = [k for k, v in validation.items() if not v]
         validate_msg = f"✓ {passed}" if all_ok else f"✓ {passed}  ✗ {failed}"
-        _cb("validate", "done" if all_ok else "running", 90, validate_msg)
+        
+        if not all_ok:
+            _cb("validate", "failed", 90, validate_msg)
+            task_manager.set_final_message(task_id, f"⚠️ Validation failed. Missing: {', '.join(failed)}")
+            task_manager.update_task(task_id, "failed", 90, "failed")
+            return
+
+        _cb("validate", "done", 90, validate_msg)
 
         # ── Stage 6: Environment ──────────────────────────────────────────────
         _cb("environment", "running", 92, "Setting up project folder and venv…")
@@ -183,6 +275,14 @@ class Orchestrator:
             )
         if pip_packages:
             final_msg += f" Extra packages: {', '.join(pip_packages)}."
+
+        # ── Stage 7: Launch installed apps ───────────────────────────────────
+        launchable = [s for s in software_list if s in _LAUNCH_EXE]
+        if launchable:
+            _cb("launch", "running", 100, f"Opening {launchable}…")
+            for sw in launchable:
+                await asyncio.to_thread(_launch, sw)
+            _cb("launch", "done", 100, "Apps launched.")
 
         # Persist to its own column FIRST, then mark status=done — the WS
         # reader calls get_task() which returns both in one row.

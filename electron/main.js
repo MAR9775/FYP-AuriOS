@@ -1,7 +1,24 @@
 
-const { app, BrowserWindow, Tray, Menu, ipcMain } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, protocol, net } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
+
+// ── Secure custom protocol ─────────────────────────────────────────────────
+// Register 'app://' as a secure, standard scheme BEFORE app.whenReady().
+// This makes Chromium treat app:// pages as a secure origin, which is required
+// for Web Speech API (SpeechRecognition) to work — it refuses to use the
+// Google speech service from an insecure file:// origin.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+    },
+  },
+]);
 
 let mainWindow = null;
 let tray = null;
@@ -10,7 +27,18 @@ const BACKEND_URL = 'http://127.0.0.1:8000';
 
 // ── Backend ────────────────────────────────────────────────────────────────
 
-function startBackend() {
+async function startBackend() {
+  // Reuse an existing backend if one is already listening on port 8000
+  try {
+    const r = await fetch(`${BACKEND_URL}/preferences`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    if (r.ok) {
+      console.log('[AuriOS] Backend already running — skipping spawn');
+      return;
+    }
+  } catch (_) {}
+
   backendProcess = require('child_process').spawn(
     'python',
     ['-m', 'uvicorn', 'backend.server:app', '--host', '127.0.0.1', '--port', '8000'],
@@ -74,7 +102,7 @@ async function saveBounds(bounds) {
 // ── Window ─────────────────────────────────────────────────────────────────
 
 async function createWindow() {
-  const { bounds, onboarded } = await loadPrefs();
+  const { bounds } = await loadPrefs();
 
   mainWindow = new BrowserWindow({
     width: bounds.width || 900,
@@ -95,11 +123,28 @@ async function createWindow() {
     show: false,
   });
 
-  const startPage = onboarded ? 'index.html' : 'onboarding.html';
-  mainWindow.loadFile(path.join(__dirname, 'renderer', startPage));
+  // Serve renderer files via app:// so the page has a secure origin.
+  // protocol.handle must be called after app is ready (inside createWindow).
+  protocol.handle('app', (req) => {
+    const { pathname } = new URL(req.url);
+    const relativePath = pathname.replace(/^\//, '') || 'index.html';
+    const filePath = path.join(__dirname, 'renderer', relativePath);
+    return net.fetch('file://' + filePath);
+  });
+
+  // Always show the splash screen first — it will IPC us when ready.
+  mainWindow.loadURL('app://app/splash.html');
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+  });
+
+  // Grant microphone permission so Web Speech API works
+  mainWindow.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
+    callback(permission === 'media' || permission === 'microphone');
+  });
+  mainWindow.webContents.session.setPermissionCheckHandler((_wc, permission) => {
+    return permission === 'media' || permission === 'microphone';
   });
 
   // Save bounds on resize / move
@@ -168,10 +213,33 @@ ipcMain.on('set-title', (_, title) => {
   if (mainWindow) mainWindow.setTitle(title);
 });
 
+// Splash complete — load the appropriate main page
+ipcMain.on('splash-complete', async () => {
+  if (!mainWindow) return;
+  const { onboarded } = await loadPrefs();
+  const startPage = onboarded ? 'index.html' : 'onboarding.html';
+  mainWindow.loadURL(`app://app/${startPage}`);
+});
+
+// Request elevation — relaunches the app with RunAs (UAC prompt)
+ipcMain.on('request-admin', () => {
+  const exePath = process.execPath;
+  const args = process.argv.slice(1).map(a => `'${a.replace(/'/g, "''")}'`).join(', ');
+  const psCmd = args
+    ? `Start-Process -FilePath '${exePath.replace(/'/g, "''")}' -ArgumentList ${args} -Verb RunAs`
+    : `Start-Process -FilePath '${exePath.replace(/'/g, "''")}' -Verb RunAs`;
+  const { spawn } = require('child_process');
+  spawn('powershell', ['-NoProfile', '-NonInteractive', '-Command', psCmd], {
+    detached: true,
+    stdio: 'ignore',
+  }).unref();
+  setTimeout(() => { app.isQuitting = true; app.quit(); }, 400);
+});
+
 // ── App lifecycle ──────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
-  startBackend();
+  await startBackend();
   await createWindow();
   createTray();
 

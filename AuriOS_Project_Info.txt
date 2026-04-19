@@ -1,0 +1,1012 @@
+================================================================================
+AURIOS v1.1 - COMPLETE PROJECT INFORMATION
+Final Year Project Documentation
+Generated: 2026-04-19
+================================================================================
+
+
+================================================================================
+1. PROJECT OVERVIEW
+================================================================================
+
+Project Name: AuriOS v1.1
+
+Purpose:
+AuriOS is a Windows desktop AI assistant designed to automate developer software
+installation through natural language conversation. It acts as an intelligent
+onboarding tool for new developers or students who need to set up a programming
+environment without manually hunting for installers, running setup wizards, or
+editing system PATH variables.
+
+Summary:
+AuriOS is a cross-architecture desktop application that combines an Electron-based
+frontend with a Python FastAPI backend and a locally hosted Ollama language model.
+When a user types or speaks a request such as "install Python for me" or "set up
+a full stack environment", the system parses the intent using a hybrid rule-based
+and LLM approach, then dispatches a multi-stage agent pipeline that detects what
+is already installed, downloads the required installers from a GitHub release
+repository, executes silent installations with preset flags, configures PATH
+variables, validates success, sets up a project virtual environment, and finally
+launches any installed GUI applications. Real-time progress is streamed to the
+frontend via WebSocket. All conversation history, user profiles, preferences, and
+installation records are persisted in a local SQLite database. The system is
+designed to work offline (Ollama is local) and to be packaged as a standalone
+Windows NSIS installer.
+
+
+================================================================================
+2. TECH STACK
+================================================================================
+
+FRONTEND
+--------
+Electron                    v41.1.1      Desktop application wrapper (Chromium + Node)
+electron-builder            v26.8.1      Windows NSIS package builder
+HTML5                       -            UI structure (index, onboarding, splash pages)
+CSS3                        -            Styling with CSS custom properties / variables
+Vanilla JavaScript          ES2020+      All UI logic, no frontend framework used
+Web Speech API              -            Browser native microphone input (speech-to-text)
+SpeechSynthesis API         -            Browser native text-to-speech for Auri replies
+Canvas API                  -            Animated avatar and splash particle effects
+WebSocket API               -            Real-time progress streaming from backend
+localStorage                -            Conversation list and active chat persistence
+
+BACKEND
+-------
+Python                      3.x          Core backend language
+FastAPI                     latest       Async REST API and WebSocket framework
+Uvicorn[standard]           latest       ASGI server (runs FastAPI)
+Pydantic                    latest       Request/response data validation models
+aiosqlite                   latest       Async SQLite driver (WAL mode)
+websockets                  latest       WebSocket protocol support
+requests                    latest       Synchronous HTTP (Ollama health checks, GitHub API)
+asyncio                     stdlib       Async task management and background workers
+subprocess                  stdlib       Running silent installers, launching apps
+shutil                      stdlib       Disk usage, PATH binary detection
+winreg                      stdlib       Windows registry reads for installed software
+ctypes                      stdlib       Windows admin privilege checking (UAC)
+platform                    stdlib       OS detection for cross-platform logic
+threading                   stdlib       Background GitHub catalog sync thread
+uuid                        stdlib       Task ID generation
+glob                        stdlib       Portable Rufus executable discovery
+pathlib                     stdlib       Cross-platform file path handling
+
+AI / LLM
+--------
+Ollama                      local        Local LLM inference server (no cloud required)
+llama3.2:3b                 -            Default language model loaded by Ollama
+llama3.2:latest             -            Docker variant model tag
+
+DATABASE
+--------
+SQLite                      3.x          Embedded relational database (file: data/aurjos.db)
+aiosqlite                   latest       Async Python driver with WAL journal mode
+
+INFRASTRUCTURE / PACKAGING
+---------------------------
+Docker                      -            Container support for backend and frontend
+docker-compose              v3+          Multi-service orchestration (backend + frontend)
+Dockerfile.backend          -            Python FastAPI container
+Dockerfile.frontend         -            Static frontend container (port 80)
+NSIS                        -            Windows installer format (via electron-builder)
+GitHub Releases API         -            Remote software catalog and installer downloads
+
+EXTERNAL SERVICES
+-----------------
+GitHub (MAR9775/AuriOS-Software-Repository)   Installer hosting and release catalog
+Ollama HTTP API (http://localhost:11434)       Local LLM inference endpoint
+
+
+================================================================================
+3. SYSTEM ARCHITECTURE
+================================================================================
+
+HIGH-LEVEL FLOW
+---------------
+
+  User Input (keyboard or microphone)
+        |
+        v
+  Electron Frontend (Renderer Process - app.js)
+        |  HTTP POST /chat via window.api (preload.js context bridge)
+        v
+  FastAPI Backend (server.py - port 8000)
+        |
+        +-- Intent Parser (llm/intent_parser.py)
+        |       |-- Rule-based keyword matcher (primary)
+        |       +-- Ollama LLM (fallback for ambiguous inputs)
+        |
+        +-- If install intent detected:
+        |       |
+        |       v
+        |   Task Manager (core/task_manager.py)
+        |   Creates UUID task, writes to SQLite tasks table
+        |       |
+        |       v
+        |   Orchestrator (core/orchestrator.py)
+        |   Runs 7-stage async agent pipeline in background
+        |       |
+        |       +-- DetectionAgent   (scans PATH + registry)
+        |       +-- DownloadAgent    (GitHub Releases API)
+        |       +-- InstallAgent     (runs .exe/.msi silently)
+        |       +-- ConfigureAgent   (PATH + pip packages)
+        |       +-- ValidationAgent  (re-detects after install)
+        |       +-- EnvironmentAgent (venv + project scaffold)
+        |       +-- Launch step      (opens GUI apps)
+        |
+        v
+  SQLite Database (data/aurjos.db)
+  Stores: conversations, preferences, installation_history, tasks
+        |
+        v
+  WebSocket /ws/progress/{task_id}
+  Streams step/status/progress to frontend every 500ms
+        |
+        v
+  Progress Panel (progress-panel.js)
+  Displays live step rows with status icons and progress bars
+
+COMPONENT RELATIONSHIPS
+-----------------------
+
+  electron/main.js
+    - Spawns Python backend via subprocess on startup
+    - Registers app:// custom protocol for CSP compatibility
+    - Manages Electron windows, tray, IPC channels
+    - Checks onboarding preference, routes to correct page
+
+  electron/preload.js
+    - Runs in isolated renderer context
+    - Exposes window.api bridge with all backend calls
+    - All HTTP and IPC are wrapped here, never direct in renderer
+
+  electron/renderer/scripts/app.js
+    - Main UI controller: conversations, dashboard, chat, suggestions
+    - Calls window.api.sendMessage(), handles response and task_id
+    - Injects progress panel if task_id returned
+
+  backend/server.py
+    - FastAPI app with CORS, lifespan DB init, all endpoints
+    - Spawns Orchestrator.run() as asyncio background task
+    - Polls task_manager for WebSocket updates
+
+  backend/llm/intent_parser.py
+    - First checks 160+ hardcoded responses (greetings, acks, etc.)
+    - Then rule-based regex for install keywords
+    - Falls back to Ollama HTTP API for ambiguous inputs
+
+  backend/utils/repo_sync.py
+    - Background thread syncs installer catalog from GitHub on startup
+    - Falls back to hardcoded catalog if GitHub unreachable
+
+
+================================================================================
+4. AGENT DETAILS
+================================================================================
+
+AGENT 1: DetectionAgent
+------------------------
+File:    backend/agents/detection_agent.py
+Role:    Scans the system to determine which software is already installed
+Input:   Empty dict {}
+Output:  {
+           "installed": {"python": True, "git": False, ...},
+           "is_admin": True/False,
+           "free_disk_gb": 45.2
+         }
+How it works:
+  1. Iterates a list of CLI tools (python, nodejs, git, docker, java,
+     mysql, postgresql, mongodb, redis, postman)
+  2. Uses shutil.which() to check if each binary is on PATH
+  3. On Windows, additionally reads the registry (winreg) to detect
+     GUI-only apps: vlc, rufus, 7zip, notepadpp
+  4. Checks Desktop and Downloads folders for portable rufus*.exe files
+  5. Calls is_admin() from admin_check.py for privilege status
+  6. Calls free_disk_gb() from platform_utils.py for disk check
+  7. Returns a unified installed dict, admin flag, and disk space
+
+AGENT 2: DownloadAgent
+------------------------
+File:    backend/agents/download_agent.py
+Role:    Downloads installer files from the GitHub software repository
+Input:   software name (string), progress_callback function
+Output:  Local file path to downloaded installer (string)
+How it works:
+  1. Calls repo_sync.get_catalog() to get the current software catalog
+  2. Looks up the GitHub Releases API URL for the requested software
+  3. Fetches the download URL from the release assets
+  4. Streams the file download with progress callbacks to UI
+  5. On non-Windows hosts (Docker), runs in simulation mode:
+     creates a zero-byte placeholder file instead of real download
+  6. Returns the local filepath on success, raises exception on failure
+
+AGENT 3: InstallAgent
+----------------------
+File:    backend/agents/install_agent.py
+Role:    Runs downloaded installers silently with preset flags
+Input:   Local filepath to installer (string)
+Output:  {"success": True/False, "error": "..." or None}
+How it works:
+  1. Detects file extension: .exe runs directly, .msi uses msiexec /i
+  2. Appends silent/quiet flags per software type:
+     Python: /quiet InstallAllUsers=1 PrependPath=1
+     Git: /VERYSILENT /NORESTART
+     VS Code: /VERYSILENT /MERGETASKS=!runcode
+     Node.js: /quiet /norestart
+     Generic EXE: /S or /silent flags
+  3. Calls subprocess.run() with 10-minute timeout
+  4. Accepts exit codes 0 (success) and 3010 (reboot required)
+  5. On non-Windows / simulation mode: returns success immediately
+     without executing any installer
+
+AGENT 4: ConfigureAgent
+------------------------
+File:    backend/agents/configure_agent.py
+Role:    Adds Python to Windows PATH and installs pip packages
+Input:   {"pip_packages": ["jupyter", "pandas", ...]}
+Output:  {"path_updated": True/False, "pip_results": {"jupyter": {"success": True}}}
+How it works:
+  1. On Windows: reads HKCU\Environment\PATH from registry
+  2. Appends Python and Python\Scripts directories if not present
+  3. Writes updated PATH back to registry via winreg.SetValueEx
+  4. Broadcasts WM_SETTINGCHANGE so existing processes pick up new PATH
+  5. For each pip package: runs [python, -m, pip, install, package]
+  6. Records success/failure per package
+  7. On non-Windows: skips PATH step, still attempts pip installs
+
+AGENT 5: ValidationAgent
+--------------------------
+File:    backend/agents/validate_agent.py
+Role:    Re-runs detection after installation to verify success
+Input:   {"expected_software": ["python", "git", "vscode"]}
+Output:  {"validation": {"python": True, "git": True, "vscode": False}}
+How it works:
+  1. Instantiates a fresh DetectionAgent and calls run({})
+  2. Compares each expected_software name against detected installed dict
+  3. Returns per-software boolean: True if detected, False if not found
+  4. On simulation mode (non-Windows): returns True for all expected tools
+  5. Used by Orchestrator to build final pass/fail message
+
+AGENT 6: EnvironmentAgent
+---------------------------
+File:    backend/agents/environment_agent.py
+Role:    Creates a Python virtual environment and project folder scaffold
+Input:   {} (no required input)
+Output:  {"venv_created": True/False, "project_root": "/path/to/project"}
+How it works:
+  1. Creates ~/AuriOS_Projects/my_project/ directory if not exists
+  2. Creates subdirectories: src/, tests/, data/, notebooks/, docs/
+  3. Runs [python, -m, venv, project_env] inside the project folder
+  4. Returns success flag and project_root path
+  5. Runs on Windows and non-Windows (platform-agnostic)
+  6. Failure is non-blocking: orchestrator continues even if venv fails
+
+
+================================================================================
+5. CORE FEATURES
+================================================================================
+
+CONVERSATIONAL INTERFACE
+  - Natural language chat input (keyboard and voice/microphone)
+  - Text-to-speech responses using browser SpeechSynthesis API
+  - Conversation history stored in SQLite and displayed in sidebar
+  - Multiple named conversation sessions with localStorage management
+  - Dashboard view with quick-start template cards
+  - Auto-complete suggestions dropdown while typing
+  - Typing indicator animation while backend processes request
+
+INTENT UNDERSTANDING
+  - 160+ hardcoded pre-canned responses for greetings, farewells, small talk
+  - Rule-based keyword detection for install intents (no LLM needed)
+  - Multilingual support: English, Hinglish, Urdu keyword variants
+  - LLM fallback via local Ollama for ambiguous queries
+  - Special handling: URL detection, weather queries, clarification prompts
+  - Software catalog browsing intent detection
+
+SOFTWARE INSTALLATION PIPELINE
+  - 7-stage automated pipeline: detect, download, install, configure, validate,
+    environment setup, and app launch
+  - Preset profiles: Python Basic, Python ML, Web Dev, Data Science, Full Stack, Java
+  - Single-software install: any tool from catalog installable individually
+  - Already-installed detection: skips download and install, goes directly to launch
+  - Silent/unattended installation with per-software preset flags
+  - Automatic Python PATH configuration via Windows registry
+  - pip package installation for ML/data science presets
+  - Project virtual environment creation at ~/AuriOS_Projects/my_project/
+
+REAL-TIME PROGRESS TRACKING
+  - WebSocket streaming from backend to frontend every 500ms
+  - Progress panel with 6 step rows (detection, download, install, configure,
+    validate, environment)
+  - Per-step status icons: pending, in-progress, done, failed
+  - Per-step animated progress bars with percentage
+  - Cancel button to abort running installation
+  - Final summary message on completion
+
+USER PROFILE AND PREFERENCES
+  - Onboarding flow on first launch (name, experience level, interests)
+  - Profile stored in SQLite preferences table
+  - Profile pill dropdown in top-right with edit and reset options
+  - Preferences API for arbitrary key-value persistent settings
+  - Installation history log accessible from UI
+
+SYSTEM STATUS MONITORING
+  - Status bar showing Ollama connection, admin privileges, disk space, Python version
+  - Full status endpoint for dashboard initialization
+  - Admin privilege detection with UAC re-launch support
+  - Disk space guard: warns if less than 1GB free before installing
+
+LOCAL AI (OLLAMA INTEGRATION)
+  - All LLM inference runs locally (no cloud, no API key)
+  - Ollama health check on startup and per request
+  - Graceful degradation: pre-canned responses if Ollama offline
+  - Model: llama3.2:3b (configurable via OLLAMA_MODEL env var)
+  - Strict system prompt constraining model to developer software domain
+
+SPLASH SCREEN AND ONBOARDING
+  - Animated splash with particle constellation, pulsing rings, glitch logo
+  - Progress bar with typing animation showing initialization steps
+  - Backend health polling before entering main app
+  - First-run onboarding form with profile setup
+  - Automatic skip if already onboarded
+
+CROSS-PLATFORM / DOCKER SUPPORT
+  - Simulation mode: non-Windows hosts (Linux/Mac) get simulated installs
+  - AURIOS_SIMULATE_INSTALL=1 env var forces simulation on any platform
+  - Docker Compose config for backend + frontend container deployment
+  - All agents have Windows guard checks before calling Win32 APIs
+  - Hardcoded fallback catalog if GitHub unreachable
+
+WINDOW MANAGEMENT
+  - Custom frameless window with custom titlebar and controls
+  - Minimize to system tray instead of closing
+  - Window bounds persistence between sessions
+  - Microphone permission auto-approved for Web Speech API
+
+
+================================================================================
+6. DATABASE SCHEMA
+================================================================================
+
+Database file: data/aurjos.db (SQLite, WAL journal mode)
+
+TABLE: conversations
+  id          INTEGER   PRIMARY KEY AUTOINCREMENT
+  timestamp   DATETIME  DEFAULT CURRENT_TIMESTAMP
+  role        TEXT      Values: 'user' or 'assistant'
+  content     TEXT      The message body
+  metadata    TEXT      Reserved for future structured metadata (currently unused)
+
+Indexes: id (primary), timestamp (implicit)
+Used by: /chat (INSERT), /history (SELECT), /history DELETE (DELETE)
+
+TABLE: preferences
+  id          INTEGER   PRIMARY KEY AUTOINCREMENT
+  key         TEXT      UNIQUE - preference name (e.g. 'user_name', 'onboarded')
+  value       TEXT      Preference value (always stored as string)
+  updated_at  DATETIME  DEFAULT CURRENT_TIMESTAMP
+
+Indexes: key (unique constraint)
+Used by: /preferences (GET/POST), /profile (GET/POST), /profile/reset (DELETE ALL)
+Known keys: user_name, experience, interests, onboarded, setup_date, window_bounds
+
+TABLE: installation_history
+  id           INTEGER  PRIMARY KEY AUTOINCREMENT
+  timestamp    DATETIME DEFAULT CURRENT_TIMESTAMP
+  preset_name  TEXT     e.g. 'python_basic', 'git', 'full_stack'
+  software     TEXT     Comma-separated list of software in the preset
+  status       TEXT     Values: 'success' or 'failed'
+  duration_s   REAL     Install duration in seconds (populated optionally)
+  error_log    TEXT     Error details if status is 'failed'
+
+Indexes: id (primary)
+Used by: /installation-history (SELECT), run_orchestrator_background (INSERT)
+
+TABLE: tasks
+  id            TEXT     PRIMARY KEY - UUID generated per install request
+  preset        TEXT     Preset name or single software name
+  status        TEXT     Values: 'pending', 'running', 'done', 'failed', 'cancelled'
+  progress      INTEGER  0 to 100 (percentage)
+  current_step  TEXT     Encoded as "step_id:step_status" e.g. "install:running"
+  final_message TEXT     Human-readable completion message for frontend display
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+  updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+
+Indexes: id (primary)
+Used by: task_manager (all CRUD), /ws/progress/{task_id} (polling), /cancel/{task_id}
+
+RELATIONSHIPS
+  - preferences table stores both profile fields and system settings (flat key-value)
+  - tasks table is decoupled from conversations (task_id returned in /chat response)
+  - No foreign keys: SQLite tables are independent, linked only by application logic
+  - installation_history is written after orchestrator completes, not during
+
+
+================================================================================
+7. API ENDPOINTS
+================================================================================
+
+Base URL: http://127.0.0.1:8000
+Framework: FastAPI 1.1.0
+CORS allowed origins: localhost, 127.0.0.1, app://app (Electron)
+
+POST /chat
+  Description: Process a user message, parse intent, trigger installation if needed
+  Request body: { "message": "string" }
+  Response: {
+    "response": "string",         Assistant reply text
+    "task_id": "uuid or null",    Set if installation started
+    "intent": "string",           Detected intent category
+    "preset_or_software": "...",  Which preset or tool was identified
+    "needs_clarification": bool   True if follow-up question sent
+  }
+  Side effects: Inserts user + assistant messages into conversations table;
+                creates task and starts orchestrator if install intent detected
+
+GET /history
+  Description: Return last 50 conversation messages in chronological order
+  Parameters: None
+  Response: Array of { id, timestamp, role, content, metadata }
+
+DELETE /history
+  Description: Delete all rows from conversations table
+  Parameters: None
+  Response: { "status": "cleared" }
+
+GET /system-status
+  Description: Basic system info with software detection via DetectionAgent
+  Parameters: None
+  Response: {
+    platform, platform_version, python_version,
+    disk_total_gb, disk_used_gb, disk_free_gb,
+    is_admin, free_disk_gb, installed: { python: bool, git: bool, ... }
+  }
+
+GET /system-status-full
+  Description: Full status: Ollama connectivity, admin, disk, and subprocess-based
+               software checks (more reliable than PATH-only)
+  Parameters: None
+  Response: {
+    ollama_connected: bool,
+    is_admin: bool,
+    free_disk_gb: float,
+    installed: { python, git, nodejs, npm, vscode, docker, java: bool }
+  }
+
+GET /profile
+  Description: Read user profile (user_name, experience, interests) from preferences
+  Parameters: None
+  Response: { user_name: string|null, experience: string|null, interests: string|null }
+
+POST /profile
+  Description: Save/update user profile fields (upsert on each key)
+  Request body: { user_name?: string, experience?: string, interests?: string }
+  Response: { "saved": ["user_name", "experience"] }
+
+POST /profile/reset
+  Description: Delete all rows from preferences table (full reset)
+  Parameters: None
+  Response: { "status": "preferences cleared" }
+
+GET /preferences
+  Description: Return all key-value rows from preferences table
+  Parameters: None
+  Response: Array of { id, key, value, updated_at }
+
+POST /preferences
+  Description: Upsert a single preference key-value pair
+  Request body: { "key": "string", "value": "string" }
+  Response: { key: string, value: string }
+
+GET /installation-history
+  Description: Return all rows from installation_history table, newest first
+  Parameters: None
+  Response: Array of { id, timestamp, preset_name, software, status, duration_s, error_log }
+
+GET /available-software
+  Description: Return the current software catalog synced from GitHub
+  Parameters: None
+  Response: Array of catalog entries sorted by display_name, each with:
+    { display_name, download_url, version, ... }
+
+POST /cancel/{task_id}
+  Description: Cancel a running installation task
+  Path param: task_id (UUID string)
+  Response: { "cancelled": true/false }
+
+WebSocket /ws/progress/{task_id}
+  Description: Stream real-time installation progress updates to frontend
+  Path param: task_id (UUID string)
+  Protocol: Server sends JSON frames every 500ms while task is running:
+    {
+      step: "detection"|"download"|"install"|"configure"|"validate"|"environment"|null,
+      status: "running"|"done"|"failed"|"cancelled",
+      progress: 0-100,
+      message: "human readable step message",
+      final_message?: "completion summary (only when status=done)"
+    }
+  Null step signals terminal state (all done, failed, or cancelled)
+  Connection closed automatically when task status is done/failed/cancelled
+
+
+================================================================================
+8. KEY ALGORITHMS
+================================================================================
+
+ALGORITHM 1: Intent Parsing (Hybrid Rule + LLM)
+-------------------------------------------------
+
+  FUNCTION parse_intent(user_message):
+
+    1. If message contains URL pattern (http, .com, .org, etc.):
+       return {"intent": "url_block", "response_text": "fixed URL reply"}
+
+    2. For each entry in PRE_CANNED_RESPONSES (160+ patterns):
+       If message matches pattern (case-insensitive keyword check):
+         return {"intent": "general", "response_text": canned_reply}
+
+    3. If message matches SHOW_SOFTWARE_PATTERNS (show, list, available, browse):
+       return {"intent": "list_software", ...}
+
+    4. Check PRESET_PATTERNS (rule-based):
+       "full stack" or "fullstack"     -> intent = "full_stack"
+       "python ml" or "machine learning" -> intent = "python_ml"
+       "data science"                  -> intent = "data_science"
+       "web dev" or "react" or "express" -> intent = "web_dev"
+       "java" (not javascript)         -> intent = "java"
+       else default python             -> intent = "python_basic"
+
+    5. Check SINGLE_SOFTWARE_PATTERNS (rule-based):
+       Keywords per tool checked in order:
+         nodejs / node.js / npm        -> "nodejs"
+         vscode / visual studio code   -> "vscode"
+         docker                        -> "docker"
+         java (standalone)             -> "java"
+         mysql                         -> "mysql"
+         postgresql / postgres         -> "postgresql"
+         mongodb / mongo               -> "mongodb"
+         redis                         -> "redis"
+         postman                       -> "postman"
+         git / github desktop          -> "git"
+         python                        -> "python"
+
+    6. Apply exclusion rules:
+       If message contains "uninstall", "remove", "delete": skip install intent
+       If message is a question (ends with ?): skip install intent
+       If message asks about status, version, check: skip install intent
+
+    7. If install intent detected in steps 4 or 5:
+       return {"intent": preset_or_software, "needs_clarification": False, ...}
+
+    8. LLM Fallback (Ollama):
+       POST to http://localhost:11434/api/generate
+       System prompt: "You are AuriOS. Only help with developer software.
+                       Reply with JSON: {intent, response_text, needs_clarification}"
+       model: llama3.2:3b, temperature: 0.3, max_tokens: 100
+       Parse JSON from LLM response
+       If Ollama unreachable: return fallback clarification response
+
+
+ALGORITHM 2: Installation Pipeline (Orchestrator ReAct Loop)
+-------------------------------------------------------------
+
+  FUNCTION Orchestrator.run(preset_name, task_id):
+
+    config = PRESET_CONFIGS[preset_name]
+      or fallback: {"software": [preset_name], "pip_packages": []}
+    software_list = config["software"]
+    pip_packages  = config["pip_packages"]
+
+    STAGE 1 - DETECT (5% to 15%):
+      Run DetectionAgent.run({})
+      installed = result["installed"]   dict of tool -> bool
+      to_install = [s for s in software_list if not installed[s]]
+      Update task: progress=15, step="detection:done"
+
+    STAGE 2 - DOWNLOAD (20% to 40%):
+      If to_install is empty: skip to stage 3
+      For each software in to_install:
+        base_pct = 20 + (index / total) * 20
+        Call DownloadAgent.download(software, progress_callback)
+        Store filepath in installer_paths[software]
+        Update task progress incrementally per file
+      Update task: progress=40, step="download:done"
+
+    STAGE 3 - INSTALL (42% to 60%):
+      If installer_paths is empty: skip
+      For each (software, filepath) in installer_paths:
+        pct = 42 + (index / total) * 18
+        Call InstallAgent.install(filepath)
+        If success: update step with check mark
+        If failed: log error, continue with next software
+      Update task: progress=60, step="install:done"
+
+    STAGE 4 - CONFIGURE (62% to 75%):
+      Call ConfigureAgent.run({"pip_packages": pip_packages})
+      Add Python to Windows PATH registry if needed
+      Run pip install for each requested package
+      Update task: progress=75, step="configure:done"
+
+    STAGE 5 - VALIDATE (77% to 90%):
+      Call ValidationAgent.run({"expected_software": software_list})
+      Re-runs DetectionAgent internally
+      Check each expected tool against fresh detection results
+      Build pass/fail lists for final message
+      Update task: progress=90, step="validate:done"
+
+    STAGE 6 - ENVIRONMENT (92% to 100%):
+      Call EnvironmentAgent.run({})
+      Create ~/AuriOS_Projects/my_project/ with subfolders
+      Create Python venv at project_env/
+      Update task: progress=100, step="environment:done"
+
+    STAGE 7 - LAUNCH (100%):
+      For each software in software_list that has a known launch executable:
+        Call _launch(software) using _LAUNCH_STATIC paths or shutil.which
+        subprocess.Popen with DETACHED_PROCESS flag (no blocking)
+
+    Build final_message string (singular/dual/plural grammar)
+    task_manager.set_final_message(task_id, final_msg)
+    task_manager.update_task(task_id, "done", 100, "complete")
+
+
+ALGORITHM 3: WebSocket Progress Streaming
+------------------------------------------
+
+  FUNCTION progress_websocket(websocket, task_id):
+
+    last_status = None
+    LOOP every 500ms:
+      task = task_manager.get_task(task_id)
+      If task not found: send error frame and break
+
+      current_status = (task.status, task.progress, task.current_step)
+      If current_status == last_status: skip (no change)
+
+      Parse current_step: split on ':' -> step_id, step_stat
+      If step_id in ("complete", "cancelled", "failed"):
+        Send frame with step=null (triggers frontend _onAllDone)
+      Else:
+        Send frame with step_id, step_stat, progress, message
+
+      If task.status == "done": attach final_message to frame
+      If task.status == "failed": attach failure message
+      If task.status == "cancelled": attach cancellation message
+
+      If task.status in (done, cancelled, failed): break loop
+
+    Close WebSocket connection
+
+
+ALGORITHM 4: Agent Selection (Detection + Already-Installed Check)
+-------------------------------------------------------------------
+
+  WHEN /chat receives install intent for single_software:
+
+    1. Check repo_sync.is_available(software_key)
+       If not available: return "not in catalog" response, no task created
+
+    2. Run DetectionAgent synchronously in thread executor
+       If detection["installed"][software_key] is True:
+         Compose "already installed" message
+         Call _launch(software_key) to open the app
+         Return response without creating a task
+         (skip the full 7-stage pipeline)
+
+    3. Else: create task_id, start Orchestrator in background
+       Return task_id so frontend opens progress panel
+
+
+================================================================================
+9. FILE STRUCTURE
+================================================================================
+
+AuriOSv1.1/
+|
+|-- backend/                         Python FastAPI backend
+|   |-- __init__.py                  Package marker
+|   |-- server.py                    Main FastAPI app, all endpoints, WebSocket
+|   |
+|   |-- agents/                      ReAct agent implementations
+|   |   |-- __init__.py              Package marker
+|   |   |-- base_agent.py            Base class: reason/act/observe pattern, logging
+|   |   |-- detection_agent.py       Scans PATH and Windows registry for installed software
+|   |   |-- download_agent.py        Downloads installers from GitHub Releases API
+|   |   |-- install_agent.py         Runs silent .exe/.msi installers via subprocess
+|   |   |-- configure_agent.py       Adds Python to PATH via winreg, runs pip installs
+|   |   |-- validate_agent.py        Re-runs DetectionAgent to verify installation success
+|   |   `-- environment_agent.py     Creates venv and project folder scaffold
+|   |
+|   |-- core/                        Orchestration and task management
+|   |   |-- models.py                Pydantic models (shared data schemas)
+|   |   |-- orchestrator.py          7-stage pipeline, PRESET_CONFIGS, PRETTY names, _launch
+|   |   `-- task_manager.py          SQLite task CRUD, UUID creation, status tracking
+|   |
+|   |-- llm/                         Language model integration
+|   |   |-- __init__.py              Package marker
+|   |   `-- intent_parser.py         Hybrid intent routing: canned -> rule-based -> Ollama
+|   |
+|   `-- utils/                       Shared utilities
+|       |-- __init__.py              Package marker
+|       |-- admin_check.py           is_admin() and relaunch_as_admin() for UAC
+|       |-- platform_utils.py        is_windows(), is_simulated_host(), free_disk_gb()
+|       `-- repo_sync.py             Background GitHub catalog sync, fallback catalog dict
+|
+|-- electron/                        Electron desktop app wrapper
+|   |-- main.js                      Main process: window, tray, IPC, backend spawn, protocol
+|   |-- preload.js                   Context bridge exposing window.api to renderer
+|   |
+|   `-- renderer/                    Frontend HTML, CSS, JavaScript
+|       |-- index.html               Main app window (chat, sidebar, dashboard, profile)
+|       |-- onboarding.html          First-run profile setup form
+|       |-- splash.html              Animated startup screen with backend health polling
+|       |
+|       |-- styles/                  CSS stylesheets
+|       |   |-- main.css             Layout, titlebar, statusbar, chat area, dark theme vars
+|       |   |-- components.css       Cards, buttons, dropdowns, modals, progress panel
+|       |   |-- agent.css            Avatar animation, agent status indicator styles
+|       |   |-- onboarding.css       Onboarding form layout and step animations
+|       |   `-- progress-panel.css   Installation progress panel step rows and bars
+|       |
+|       `-- scripts/                 JavaScript modules
+|           |-- app.js               Main UI controller: conversations, dashboard, chat, suggestions
+|           |-- agent-animation.js   Canvas-based animated avatar rendering
+|           |-- progress-panel.js    WebSocket client, step rows, cancel button
+|           |-- onboarding.js        Onboarding form submit, profile POST, redirect
+|           |-- profile.js           Profile dropdown edit/save/reset, history display
+|           |-- speech.js            Web Speech API microphone input handler
+|           |-- tts.js               SpeechSynthesis API text-to-speech for Auri replies
+|           `-- web-api.js           Additional fetch wrappers for catalog and status APIs
+|
+|-- data/                            Runtime data (created at first launch)
+|   `-- aurjos.db                    SQLite database file
+|
+|-- logs/                            Runtime logs (created at first launch)
+|   `-- aurjos.log                   Agent debug log (DEBUG level)
+|
+|-- AuriOS_Project_Info.txt          This documentation file
+|-- docker-compose.yml               Docker multi-service config (backend + frontend)
+|-- Dockerfile.backend               Python FastAPI container definition
+|-- Dockerfile.frontend              Static frontend container definition
+|-- docker-daemon-config.json        Docker daemon settings
+|-- package.json                     Node.js manifest: Electron version, build config
+|-- package-lock.json                Locked npm dependency tree
+|-- requirements.txt                 Python package dependencies
+|-- setup.py                         Database initialization script (run once)
+|-- backend/utils/repo_sync.py       (also listed above - GitHub catalog sync)
+`-- rufus.com                        (unknown file - may be stale artifact)
+
+
+================================================================================
+10. USER FLOW
+================================================================================
+
+STEP 1: APPLICATION LAUNCH
+  User double-clicks AuriOS desktop icon or NSIS-installed shortcut.
+  electron/main.js starts, registers app:// protocol, creates BrowserWindow.
+  Splash window loads (electron/renderer/splash.html).
+
+STEP 2: SPLASH SCREEN
+  Particle constellation canvas animates.
+  Typing animation shows: "Initializing AuriOS...", "Loading agent pipeline...",
+  "Connecting to Ollama...", "Almost ready..."
+  Progress bar animates from 0% to ~72% over 3 seconds.
+  Main process spawns Python backend: "python -m uvicorn backend.server:app"
+  Splash polls GET /system-status-full every 500ms (up to 9 times).
+  When backend responds 200 OK, progress bar jumps to 100%.
+  Splash fades out, calls window.api.splashComplete() via IPC.
+
+STEP 3: ONBOARDING (first run only)
+  main.js checks preferences table for key "onboarded".
+  If not found: loads onboarding.html.
+  User enters: name (required), experience level (radio), interests (checkboxes).
+  JavaScript POSTs /profile with { user_name, experience, interests }.
+  Then POSTs /preferences with { key: "onboarded", value: "true" }.
+  Redirect to index.html.
+
+STEP 4: MAIN DASHBOARD
+  index.html loads. Renderer calls window.api.getStatus() and window.api.getProfile().
+  Status bar updates: Ollama (green/red dot), Admin (shield), Disk (GB), Python version.
+  Dashboard shows: personalized greeting with user's name, 6 template cards,
+  recent conversation history (last 5 items from sidebar).
+  Sidebar lists all stored conversation sessions from localStorage.
+
+STEP 5: USER SENDS A MESSAGE
+  User types in textarea (or clicks a template card or uses microphone).
+  Microphone: speech.js captures voice via Web Speech API, fills textarea.
+  User presses Enter or clicks Send button.
+  app.js calls window.api.sendMessage(text) which IPC-calls preload.js.
+  preload.js POSTs to http://127.0.0.1:8000/chat with { "message": text }.
+  Typing indicator (three bouncing dots) appears in chat.
+
+STEP 6: BACKEND PROCESSES THE MESSAGE
+  server.py /chat handler receives the request.
+  Saves user message to conversations table.
+  Calls parse_intent(user_message) in a thread executor.
+  Intent parser checks: pre-canned? -> rule-based? -> Ollama LLM?
+  Returns intent category and response_text.
+
+STEP 7a: NON-INSTALL RESPONSE
+  If intent is general/greeting/weather/url/list_software:
+  Backend returns { response: "...", task_id: null }.
+  Frontend renders assistant message bubble with response text.
+  If TTS enabled (tts.js): SpeechSynthesis reads the response aloud.
+  Conversation saved to localStorage.
+
+STEP 7b: INSTALL INTENT DETECTED
+  Backend checks: is_admin()? enough disk (>1GB)? software in catalog?
+  If single_software: checks if already installed via DetectionAgent.
+  If already installed: returns "already installed" message + launches app.
+  If needs install:
+    Creates task_id = UUID via task_manager.create_task(preset)
+    Spawns asyncio.create_task(run_orchestrator_background(preset, task_id))
+    Returns { response: "Starting setup...", task_id: "uuid" }
+
+STEP 8: PROGRESS PANEL OPENS
+  Frontend receives task_id in response.
+  progress-panel.js injects the progress panel into the right side of the window.
+  Panel shows 6 step rows: detection, download, install, configure, validate, environment.
+  All steps start with pending (grey square) icon.
+  WebSocket opens to ws://127.0.0.1:8000/ws/progress/{task_id}
+
+STEP 9: INSTALLATION RUNS IN BACKGROUND
+  Orchestrator runs 7 stages asynchronously (see Algorithm 2 above).
+  After each stage, task_manager.update_task() writes new status to SQLite tasks table.
+  WebSocket handler polls tasks table every 500ms.
+  When progress changes, sends JSON frame to frontend.
+  progress-panel.js receives frames, updates step icons and progress bars in real time.
+  User can click Cancel button to POST /cancel/{task_id} at any time.
+
+STEP 10: INSTALLATION COMPLETES
+  Orchestrator calls task_manager.set_final_message() then update_task("done", 100).
+  WebSocket sends final frame with null step and final_message field.
+  progress-panel.js calls _onAllDone(): panel slides out after 3 seconds.
+  Final message (e.g. "Python, Git, and VS Code are installed and ready!") appears
+  in the chat as the assistant's last message.
+  VS Code / Postman / Docker open automatically if they were installed (launch step).
+  Installation logged to installation_history table.
+
+STEP 11: NEXT INTERACTION
+  User can type another message, start a new conversation (sidebar New Chat button),
+  browse available software, or view installation history from the profile dropdown.
+  Conversation persists across app restarts via SQLite + localStorage.
+
+
+================================================================================
+11. LIMITATIONS
+================================================================================
+
+PLATFORM LIMITATIONS
+  - Designed exclusively for Windows. Core functionality (registry writes, UAC,
+    silent EXE/MSI installers) does not work on macOS or Linux.
+  - Simulation mode on non-Windows pretends to install but makes no real changes.
+  - Requires administrator privileges for all installations. No unprivileged mode.
+
+AI / LLM LIMITATIONS
+  - Ollama and llama3.2:3b must be installed and running separately before AuriOS
+    starts. There is no bundled model or automatic Ollama installation.
+  - LLM understanding is constrained to a narrow domain prompt. Complex or
+    multi-part requests may not be understood correctly.
+  - Rule-based intent parser covers a fixed vocabulary. Unusual phrasings or
+    languages beyond English/Hinglish/Urdu will fall through to LLM or fail.
+  - LLM responses are limited to 100 tokens which can truncate explanations.
+
+SOFTWARE CATALOG LIMITATIONS
+  - Only 12-15 developer tools are available in the catalog. No general-purpose
+    software (games, office apps, browsers) can be installed.
+  - Catalog depends on a live GitHub repository (MAR9775/AuriOS-Software-Repository).
+    If the repo is down or rate-limited, falls back to a hardcoded catalog.
+  - No version selection: installs whatever version is in the GitHub release.
+  - No uninstall capability. Users must remove software manually.
+  - No update/upgrade functionality for already-installed software.
+
+INSTALLATION LIMITATIONS
+  - InstallAgent uses hardcoded silent flags per tool. If an installer changes
+    its flag syntax in a new version, silent install may fail.
+  - 10-minute timeout per installer: very large packages may fail.
+  - Exit code 3010 (reboot required) is treated as success but the system is not
+    actually rebooted, which may cause the software to not work immediately.
+  - pip package versions are not pinned (except tensorflow==2.15.0), which can
+    cause dependency conflicts or breaks on future pip releases.
+  - No rollback: if install fails mid-pipeline, previously installed tools remain.
+    There is no undo or cleanup mechanism.
+
+VALIDATION LIMITATIONS
+  - ValidationAgent only checks if the binary is detectable on PATH after install.
+    It does not verify functionality, version correctness, or configuration.
+  - Registry-detected software (VLC, Rufus, 7zip, Notepad++) is not re-validated
+    after install because re-reading registry takes time.
+
+DATABASE / STORAGE LIMITATIONS
+  - Conversation history is capped at 50 messages returned by /history. Older
+    messages remain in the database but are not shown in the UI.
+  - No data export. User cannot export conversations or installation history.
+  - No encryption on the SQLite database. Sensitive profile data is plaintext.
+  - Tasks table is never cleaned up. Old task records accumulate indefinitely.
+
+UI / UX LIMITATIONS
+  - Frontend is built with vanilla JavaScript and no component framework. Large
+    feature additions will increase complexity of app.js quickly.
+  - No dark/light theme toggle. Dark theme is fixed.
+  - Voice input relies on Web Speech API which requires an internet connection
+    for the speech recognition service on some Windows configurations.
+  - No internationalization (i18n) beyond hardcoded Hinglish/Urdu keywords.
+  - Progress panel does not show individual file download speeds or ETAs.
+  - Software browser does not allow comparing tools or showing descriptions/docs.
+
+SECURITY LIMITATIONS
+  - Backend runs on localhost:8000 with no authentication. Any process on the
+    same machine can make API calls to it.
+  - CORS allows null origin (needed for Electron file:// but could be abused).
+  - Installer files are downloaded without cryptographic signature verification.
+  - No sandboxing of installer execution: silent install runs with full admin.
+
+
+================================================================================
+12. FUTURE WORK
+================================================================================
+
+AI AND INTELLIGENCE IMPROVEMENTS
+  - Upgrade to a larger, more capable local model (llama3.1:8b or Mistral 7B)
+    for better intent understanding and more helpful conversational responses.
+  - Add memory to the LLM context: include recent conversation history in the
+    Ollama prompt so the assistant can reference previous installs and user context.
+  - Implement semantic search over the software catalog so users can ask
+    "what do I need for building Android apps?" and get relevant tool suggestions.
+  - Add streaming token output from Ollama so LLM responses appear word-by-word
+    rather than all at once after a delay.
+  - Support multi-turn installation planning where AuriOS asks clarifying questions
+    before choosing a preset (e.g., "Are you using TensorFlow or PyTorch?").
+
+SOFTWARE CATALOG EXPANSION
+  - Expand the catalog beyond 15 tools to include: Rust, Go, Ruby, PHP,
+    Android Studio, IntelliJ IDEA, PyCharm, Anaconda, XAMPP, Nginx, PostgreSQL GUI.
+  - Add version selection: let users specify "install Python 3.11" vs "Python 3.12".
+  - Support software update detection: compare installed version vs latest release.
+  - Add uninstall capability using Windows Add/Remove Programs or winget.
+  - Integrate Windows Package Manager (winget) as an alternative download source.
+
+INSTALLATION PIPELINE IMPROVEMENTS
+  - Add rollback support: track what was installed in a session and offer to undo.
+  - Per-installer progress parsing: read stdout/stderr from installers to show
+    real percentage instead of simulated increments.
+  - Parallel downloads: download multiple installers simultaneously instead of
+    sequentially to reduce total install time.
+  - Retry logic: automatically retry failed downloads up to 3 times before failing.
+  - Checksum verification: validate SHA256 of downloaded installers against catalog.
+  - Dependency resolution: automatically add required tools (e.g., if user asks
+    for TensorFlow, auto-include Python if not present).
+
+USER EXPERIENCE
+  - Add dark/light theme toggle with user preference persistence.
+  - Build a visual software browser with icons, descriptions, and version info.
+  - Add installation history analytics: charts showing most-installed tools,
+    success rates, and average install durations.
+  - Support drag-and-drop installer files for local installs outside the catalog.
+  - Add a tutorial/guided walkthrough mode for first-time users.
+  - Improve accessibility: keyboard navigation, screen reader support, ARIA labels.
+  - Add notification system: Windows toast notifications on install complete.
+  - Multi-language UI: full Urdu/Hindi UI translation, not just keyword detection.
+
+SYSTEM AND INFRASTRUCTURE
+  - Auto-detect and install Ollama if not present (bundle a small installer).
+  - Support auto-updates of AuriOS itself using electron-updater.
+  - Add telemetry opt-in: anonymous usage data for improving tool suggestions.
+  - Implement a plugin/extension system for community-contributed software recipes.
+  - Support macOS: replace winreg and UAC calls with macOS equivalents (brew, sudo).
+  - Add a web interface as an alternative to the Electron app for remote use.
+  - Implement proper task queue for running multiple installations sequentially.
+  - Add CI/CD pipeline for automated testing of agent pipeline on each commit.
+
+SECURITY AND RELIABILITY
+  - Add authentication to the backend API (token-based) to prevent localhost abuse.
+  - Implement installer signature verification using Windows Authenticode checking.
+  - Encrypt the SQLite database using SQLCipher for user privacy.
+  - Add automated tests for agent behavior using mocked subprocess and registry calls.
+  - Add integration tests that test the full pipeline in a Windows VM environment.
+  - Rate-limit the /chat endpoint to prevent abuse or runaway install loops.
+
+
+================================================================================
+END OF DOCUMENT
+================================================================================

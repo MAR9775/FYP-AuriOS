@@ -1,12 +1,4 @@
 services:
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-
   backend:
     build:
       context: .
@@ -17,10 +9,10 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
     environment:
-      - OLLAMA_URL=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:1b}
-    depends_on:
-      - ollama
+      - OLLAMA_URL=http://host.docker.internal:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:latest}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   frontend:
@@ -32,6 +24,3 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-
-volumes:
-  ollama_data:

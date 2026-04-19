@@ -1,6 +1,6 @@
 /* profile.js — Profile pill, dropdown, and modal panels */
 
-const _BASE = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
+const _BASE = 'http://127.0.0.1:8000';
 
 let dropdownOpen = false;
 
@@ -179,6 +179,21 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (avatarEl) avatarEl.textContent = name.charAt(0).toUpperCase();
     }
   } catch (_) {}
+
+  // Profile pill click — toggle dropdown (replaces inline onclick blocked by CSP)
+  document.getElementById('profile-pill')?.addEventListener('click', toggleProfileDropdown);
+
+  // Dropdown items wired via data-action (replaces inline onclick blocked by CSP)
+  const ddActions = {
+    'my-profile':      showMyProfile,
+    'install-history': showInstallHistory,
+    'preferences':     showPreferences,
+    'reset':           resetProfile,
+  };
+  document.querySelectorAll('#profile-dropdown .dropdown-item[data-action]').forEach(item => {
+    const handler = ddActions[item.dataset.action];
+    if (handler) item.addEventListener('click', handler);
+  });
 
   // Modal close button
   document.getElementById('modal-close-btn')?.addEventListener('click', closeModal);

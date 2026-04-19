@@ -1,4 +1,7 @@
-/* speech.js — Voice INPUT only (SpeechRecognition + waveform) */
+/* speech.js — Voice INPUT only (SpeechRecognition + waveform)
+ * Sets window._lastInputWasVoice = true before calling sendMessage so
+ * app.js knows to auto-speak the AI response.
+ */
 
 (function () {
   const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -20,14 +23,14 @@
       bar.className = 'wave-bar';
       waveformEl.appendChild(bar);
     }
-    if (micBtn && micBtn.parentNode) {
-      micBtn.parentNode.insertBefore(waveformEl, micBtn.nextSibling);
-    }
+    const inputInner = document.getElementById('input-bar-inner');
+    const target = inputInner || (micBtn && micBtn.parentNode);
+    if (target) target.insertBefore(waveformEl, micBtn ? micBtn.nextSibling : null);
   }
 
   function showWaveform(visible) {
     buildWaveform();
-    waveformEl.classList.toggle('hidden', !visible);
+    if (waveformEl) waveformEl.classList.toggle('hidden', !visible);
   }
 
   // ── Label below mic button ────────────────────────────────────────────────
@@ -35,7 +38,9 @@
     if (!micLabelEl) {
       micLabelEl = document.createElement('div');
       micLabelEl.className = 'mic-label';
-      if (micBtn && micBtn.parentNode) micBtn.parentNode.appendChild(micLabelEl);
+      const inputInner = document.getElementById('input-bar-inner');
+      const target = inputInner || (micBtn && micBtn.parentNode);
+      if (target) target.appendChild(micLabelEl);
     }
     micLabelEl.textContent = text;
     micLabelEl.style.display = text ? 'block' : 'none';
@@ -46,7 +51,8 @@
     if (!SpeechRec) {
       if (!unsupportedShown) {
         unsupportedShown = true;
-        const msgs = document.getElementById('chat-messages');
+        const msgs = document.getElementById('messages-inner') ||
+                     document.getElementById('chat-messages');
         if (msgs) {
           const wrapper = document.createElement('div');
           wrapper.className = 'message auri';
@@ -55,9 +61,10 @@
           bubble.textContent = '🎙️ Voice input is not supported in this environment.';
           wrapper.appendChild(bubble);
           msgs.appendChild(wrapper);
-          msgs.scrollTop = msgs.scrollHeight;
+          const scroll = document.getElementById('chat-messages');
+          if (scroll) scroll.scrollTop = scroll.scrollHeight;
         }
-        if (micBtn) micBtn.style.display = 'none';
+        if (micBtn) micBtn.style.opacity = '0.3';
       }
       return;
     }
@@ -71,47 +78,80 @@
     recognition.lang = 'en-US';
     recognition.continuous = false;
     recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
       isListening = true;
-      micBtn.classList.add('active');
-      setMicLabel('Stop listening');
+      if (micBtn) micBtn.classList.add('active');
+      setMicLabel('Listening…');
       showWaveform(true);
       if (window.agentAnimation) window.agentAnimation.setState('listening');
     };
 
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
+      const transcript = event.results[0][0].transcript.trim();
+      if (!transcript) return;
       const input = document.getElementById('chat-input');
       if (input) {
         input.value = transcript;
-        input.dispatchEvent(new Event('keyup'));
+        // Dispatch 'input' so app.js updates send-button state
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        // Mark this as a voice-originated message so app.js auto-speaks the reply
+        window._lastInputWasVoice = true;
         if (typeof sendMessage === 'function') sendMessage();
       }
     };
 
     recognition.onend = () => {
       isListening = false;
-      micBtn.classList.remove('active');
+      if (micBtn) micBtn.classList.remove('active');
       setMicLabel('');
       showWaveform(false);
       if (window.agentAnimation) window.agentAnimation.setState('idle');
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
       isListening = false;
-      micBtn.classList.remove('active');
+      if (micBtn) micBtn.classList.remove('active');
       setMicLabel('');
       showWaveform(false);
       if (window.agentAnimation) window.agentAnimation.setState('idle');
+      window._lastInputWasVoice = false;
+
+      // Show user-friendly error for common cases
+      const errMap = {
+        'not-allowed':  '🎙️ Microphone access denied. Please allow microphone access.',
+        'no-speech':    '',   // silent — user just didn't speak
+        'audio-capture':'🎙️ No microphone found.',
+        'network':      '🎙️ Speech recognition requires an internet connection.',
+      };
+      const msg = errMap[event.error];
+      if (msg) {
+        const msgs = document.getElementById('messages-inner') ||
+                     document.getElementById('chat-messages');
+        if (msgs) {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'message auri';
+          const bubble = document.createElement('div');
+          bubble.className = 'bubble';
+          bubble.textContent = msg;
+          wrapper.appendChild(bubble);
+          msgs.appendChild(wrapper);
+          const scroll = document.getElementById('chat-messages');
+          if (scroll) scroll.scrollTop = scroll.scrollHeight;
+        }
+      }
     };
 
     recognition.start();
   }
 
-  // ── Public interface ──────────────────────────────────────────────────────
-  window.speech = { toggleListening };
+  // ── Bind mic button via addEventListener (CSP blocks inline onclick) ───────
+  if (micBtn) {
+    micBtn.addEventListener('click', toggleListening);
+  }
 
-  // Legacy onclick="toggleVoice()" in HTML
-  window.toggleVoice = toggleListening;
+  // ── Public interface ──────────────────────────────────────────────────────
+  window.speech     = { toggleListening };
+  window.toggleVoice = toggleListening;   // keep legacy reference
 })();

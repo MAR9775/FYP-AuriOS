@@ -6,11 +6,10 @@
 (function () {
   let enabled = true; // updated from preferences on load
 
-  // Load voice preference
+  // Load voice preference (always use absolute URL — page runs on app:// protocol)
   window.addEventListener('DOMContentLoaded', async () => {
     try {
-      const base = window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : '';
-      const prefs = await fetch(`${base}/preferences`).then(r => r.json());
+      const prefs = await fetch('http://127.0.0.1:8000/preferences').then(r => r.json());
       enabled = prefs?.voice_enabled !== 'false';
     } catch (_) {}
   });

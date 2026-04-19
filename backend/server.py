@@ -22,6 +22,7 @@ from backend.core.task_manager import task_manager
 from backend.llm.intent_parser import parse_intent
 from backend.utils.admin_check import is_admin
 from backend.utils.platform_utils import free_disk_gb, is_windows
+from backend.utils import repo_sync
 
 # ---------------------------------------------------------------------------
 # Task infrastructure
@@ -132,6 +133,8 @@ async def lifespan(app: FastAPI):
             """
         )
         await db.commit()
+
+    repo_sync.startup_sync()
     yield
 
 
@@ -145,7 +148,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["null", "http://localhost", "http://127.0.0.1",
                    "http://localhost:3000", "http://127.0.0.1:3000",
-                   "http://localhost:5173", "http://127.0.0.1:5173"],
+                   "http://localhost:5173", "http://127.0.0.1:5173",
+                   "app://app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -169,18 +173,19 @@ async def run_orchestrator_background(preset: str, task_id: str):
         await orchestrator.run(
             preset_name=preset,
             task_id=task_id,
-            progress_callback=lambda step, status, pct, msg:
-                task_manager.update_task(task_id, status, pct, step)
+            progress_callback=lambda step, status, pct, msg: None,
         )
         # Save to installation history
+        task = task_manager.get_task(task_id)
+        final_status = task["status"] if task else "unknown"
         async with get_db() as db:
             await db.execute(
                 "INSERT INTO installation_history (preset_name, status) VALUES (?, ?)",
-                (preset, "success")
+                (preset, final_status)
             )
             await db.commit()
     except Exception as e:
-        task_manager.update_task(task_id, "failed", 0, str(e))
+        task_manager.update_task(task_id, "failed", 0, f"failed:{e}")
 
 
 _INSTALL_INTENTS = {
@@ -188,6 +193,14 @@ _INSTALL_INTENTS = {
     "full_stack", "data_science", "java",
     "single_software",
 }
+
+
+def _format_software_list() -> str:
+    """Return a formatted list of available software from the catalog."""
+    catalog = repo_sync.get_catalog()
+    names = sorted(e["display_name"] for e in catalog.values())
+    items = "\n".join(f"• {n}" for n in names)
+    return f"Here's what I can install for you:\n{items}\n\nJust say 'install <name>' to get started!"
 
 
 @app.post("/chat")
@@ -208,7 +221,10 @@ async def chat(request: ChatRequest):
     response_text = result["response_text"]
     task_id = None
 
-    if result["needs_clarification"]:
+    if result["intent"] == "list_software":
+        response_text = _format_software_list()
+
+    elif result["needs_clarification"]:
         # Just respond with clarifying question, no install
         pass
 
@@ -234,17 +250,62 @@ async def chat(request: ChatRequest):
                 # to a synthesized single-software config.
                 if result["intent"] == "single_software":
                     preset_key = result.get("preset_or_software") or "unknown"
+                    if not repo_sync.is_available(preset_key):
+                        response_text = (
+                            f"Sorry, **{preset_key}** isn't available in the AuriOS "
+                            f"repository yet. You can browse what's available by asking "
+                            f"me to 'show available software'."
+                        )
+                        async with get_db() as db:
+                            await db.execute(
+                                "INSERT INTO conversations (role, content) VALUES (?, ?)",
+                                ("assistant", response_text),
+                            )
+                            await db.commit()
+                        return {
+                            "response": response_text,
+                            "task_id": None,
+                            "intent": result["intent"],
+                            "preset_or_software": preset_key,
+                            "needs_clarification": False,
+                        }
+
+                    # Check if already installed — skip re-install, just launch
+                    detection = await asyncio.to_thread(
+                        lambda: DetectionAgent().run({})
+                    )
+                    if detection.get("installed", {}).get(preset_key):
+                        label = PRETTY.get(preset_key, preset_key)
+                        response_text = (
+                            f"**{label}** is already installed on your PC! "
+                            f"Opening it for you now. ✅"
+                        )
+                        from backend.core.orchestrator import _launch
+                        await asyncio.to_thread(_launch, preset_key)
+                        async with get_db() as db:
+                            await db.execute(
+                                "INSERT INTO conversations (role, content) VALUES (?, ?)",
+                                ("assistant", response_text),
+                            )
+                            await db.commit()
+                        return {
+                            "response": response_text,
+                            "task_id": None,
+                            "intent": result["intent"],
+                            "preset_or_software": preset_key,
+                            "needs_clarification": False,
+                        }
                 else:
                     preset_key = result["intent"]
 
-                # Keep the LLM's confirmation text if it has one; otherwise
-                # fall back to a canned message using the pretty label.
+                # Always use a controlled message — never let the LLM claim
+                # the software is already installed or was installed successfully,
+                # since it generates that text before any real install happens.
                 label = PRETTY.get(preset_key, preset_key)
-                if not response_text or response_text.strip() == "":
-                    response_text = (
-                        f"Got it! Starting {label} setup now. "
-                        f"Watch the progress panel on the right! 🚀"
-                    )
+                response_text = (
+                    f"Got it! Starting **{label}** setup now. "
+                    f"Watch the progress panel on the right! 🚀"
+                )
 
                 task_id = task_manager.create_task(preset_key)
                 asyncio.create_task(
@@ -486,11 +547,21 @@ async def progress_websocket(websocket: WebSocket, task_id: str):
             # Only send if something changed
             current_status = (task["status"], task["progress"], task["current_step"])
             if current_status != last_status:
+                # current_step is encoded as "step_id:step_status" by the orchestrator.
+                raw = task["current_step"] or ""
+                if ":" in raw:
+                    step_id, step_stat = raw.split(":", 1)
+                else:
+                    step_id, step_stat = raw, task["status"]
+
+                # Terminal markers have no matching panel row — send null step so
+                # the frontend's updateStep triggers _onAllDone instead.
+                _TERMINAL = {"complete", "cancelled", "failed"}
                 payload: Dict[str, Any] = {
-                    "step":     task["current_step"],
-                    "status":   task["status"],
+                    "step":     step_id if step_id not in _TERMINAL else None,
+                    "status":   step_stat,
                     "progress": task["progress"],
-                    "message":  f"{task['current_step']} — {task['status']}",
+                    "message":  f"{step_id} — {step_stat}",
                 }
                 if task["status"] == "done":
                     fm = task.get("final_message")
@@ -515,6 +586,17 @@ async def progress_websocket(websocket: WebSocket, task_id: str):
         pass
     finally:
         await websocket.close()
+
+
+# ---------------------------------------------------------------------------
+# Available software catalog
+# ---------------------------------------------------------------------------
+
+@app.get("/available-software")
+async def available_software() -> list[Dict[str, Any]]:
+    """Return the current software catalog from the GitHub repository."""
+    catalog = await asyncio.to_thread(repo_sync.get_catalog)
+    return sorted(catalog.values(), key=lambda e: e["display_name"])
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
-/* app.js — Chat logic, dashboard, view routing, suggestions, status bar */
+/* app.js — Chat logic, sidebar/conversation manager, status bar, event wiring */
 
 const chatMessages  = document.getElementById('chat-messages');
+const messagesInner = document.getElementById('messages-inner');
 const chatInput     = document.getElementById('chat-input');
 const sendBtn       = document.getElementById('send-btn');
 const typingEl      = document.getElementById('typing-indicator');
@@ -33,6 +34,116 @@ const SUGGESTIONS = [
   'Install Redis',
   'Set up a virtual environment in Python',
 ];
+
+// ── Conversation manager (localStorage) ──────────────────────────────────────
+const CONVS_KEY  = 'aurios_conversations';
+const ACTIVE_KEY = 'aurios_active_conv';
+
+const conversationManager = {
+  load() {
+    try { return JSON.parse(localStorage.getItem(CONVS_KEY) || '[]'); }
+    catch (_) { return []; }
+  },
+  save(convs) {
+    try { localStorage.setItem(CONVS_KEY, JSON.stringify(convs.slice(0, 60))); }
+    catch (_) {}
+  },
+  getActiveId() { return localStorage.getItem(ACTIVE_KEY) || null; },
+  setActiveId(id) { localStorage.setItem(ACTIVE_KEY, id); },
+  getActive() {
+    const id = this.getActiveId();
+    if (!id) return null;
+    return this.load().find(c => c.id === id) || null;
+  },
+  create() {
+    const id = 'conv_' + Date.now();
+    const conv = { id, title: 'New Chat', messages: [], createdAt: Date.now() };
+    const convs = this.load();
+    convs.unshift(conv);
+    this.save(convs);
+    this.setActiveId(id);
+    return conv;
+  },
+  addMessage(role, content, timestamp) {
+    const id = this.getActiveId();
+    if (!id) return;
+    const convs = this.load();
+    const conv = convs.find(c => c.id === id);
+    if (!conv) return;
+    conv.messages.push({ role, content, timestamp: timestamp || new Date().toISOString() });
+    if (conv.title === 'New Chat' && role === 'user') {
+      conv.title = content.length > 42 ? content.slice(0, 42) + '…' : content;
+    }
+    this.save(convs);
+  },
+  deleteConv(id) {
+    const convs = this.load().filter(c => c.id !== id);
+    this.save(convs);
+    if (this.getActiveId() === id) localStorage.removeItem(ACTIVE_KEY);
+  },
+};
+
+// ── Sidebar rendering ─────────────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById('chat-history-list');
+  if (!list) return;
+  const convs = conversationManager.load();
+  const activeId = conversationManager.getActiveId();
+  list.innerHTML = '';
+
+  if (convs.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'padding:12px 10px;font-size:11px;color:var(--text-secondary);text-align:center;';
+    empty.textContent = 'No conversations yet';
+    list.appendChild(empty);
+    return;
+  }
+
+  convs.forEach(conv => {
+    const item = document.createElement('div');
+    item.className = 'chat-history-item' + (conv.id === activeId ? ' active' : '');
+    item.innerHTML = `
+      <span class="history-icon">💬</span>
+      <span class="history-title">${escapeHtml(conv.title)}</span>
+    `;
+    item.addEventListener('click', () => switchConversation(conv.id));
+    list.appendChild(item);
+  });
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function switchConversation(convId) {
+  conversationManager.setActiveId(convId);
+  const convs = conversationManager.load();
+  const conv = convs.find(c => c.id === convId);
+  if (!conv) return;
+  if (messagesInner) messagesInner.innerHTML = '';
+  lastAuriReply = '';
+  if (conv.messages.length > 0) {
+    conv.messages.forEach(m => renderMessage(m.role, m.content, m.timestamp, true));
+    showChat();
+    const lastAssistant = [...conv.messages].reverse().find(m => m.role === 'assistant');
+    if (lastAssistant) lastAuriReply = lastAssistant.content;
+  } else {
+    showDashboard();
+  }
+  renderSidebar();
+}
+
+function startNewChat() {
+  conversationManager.create();
+  if (messagesInner) messagesInner.innerHTML = '';
+  lastAuriReply = '';
+  showDashboard();
+  renderSidebar();
+}
 
 // ── Time-based greeting ───────────────────────────────────────────────────────
 function getGreeting() {
@@ -78,17 +189,14 @@ function addRecentItem(text) {
   const list = document.getElementById('recent-list');
   const section = document.getElementById('recent-section');
   if (!list) return;
-
-  // Avoid duplicate entries
   const existing = Array.from(list.children).find(el =>
     el.querySelector('.recent-text')?.textContent === text
   );
   if (existing) return;
-
   const item = document.createElement('div');
   item.className = 'recent-item';
   item.innerHTML = `<span class="recent-item-icon">💬</span>
-    <span class="recent-text">${text}</span>`;
+    <span class="recent-text">${escapeHtml(text)}</span>`;
   item.addEventListener('click', () => {
     chatInput.value = text;
     autoResizeTextarea();
@@ -96,8 +204,6 @@ function addRecentItem(text) {
     showChat();
   });
   list.insertBefore(item, list.firstChild);
-
-  // Keep max 5 recent items
   while (list.children.length > 5) list.removeChild(list.lastChild);
   if (section) section.style.display = '';
 }
@@ -112,18 +218,16 @@ function autoResizeTextarea() {
 function showSuggestions(query) {
   const q = query.trim().toLowerCase();
   if (!q || q.length < 2) { hideSuggestions(); return; }
-
   const matches = SUGGESTIONS.filter(s => s.toLowerCase().includes(q)).slice(0, 6);
   if (!matches.length) { hideSuggestions(); return; }
-
   suggestionsEl.innerHTML = '';
   suggestionIndex = -1;
-  matches.forEach((s, i) => {
+  matches.forEach(s => {
     const item = document.createElement('div');
     item.className = 'suggestion-item';
     item.textContent = s;
     item.addEventListener('mousedown', (e) => {
-      e.preventDefault();   // keep focus on input
+      e.preventDefault();
       chatInput.value = s;
       autoResizeTextarea();
       updateSendBtnState();
@@ -180,30 +284,22 @@ chatInput.addEventListener('keydown', (e) => {
     }
     if (e.key === 'Escape') { hideSuggestions(); return; }
   }
-
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 
-chatInput.addEventListener('blur', () => {
-  setTimeout(hideSuggestions, 150);
-});
+chatInput.addEventListener('blur', () => { setTimeout(hideSuggestions, 150); });
 
 // ── Backend-offline banner ────────────────────────────────────────────────────
 function showBackendBanner() {
   if (backendOffline) return;
   backendOffline = true;
-  const banner = document.getElementById('backend-banner');
-  if (banner) banner.classList.remove('hidden');
+  document.getElementById('backend-banner')?.classList.remove('hidden');
   if (!backendRetryTmr) backendRetryTmr = setInterval(retryBackend, 10000);
 }
 
 function hideBackendBanner() {
   backendOffline = false;
-  const banner = document.getElementById('backend-banner');
-  if (banner) banner.classList.add('hidden');
+  document.getElementById('backend-banner')?.classList.add('hidden');
   if (backendRetryTmr) { clearInterval(backendRetryTmr); backendRetryTmr = null; }
 }
 
@@ -225,7 +321,17 @@ async function sendMessage() {
 
   hideSuggestions();
 
-  // Voice on-demand
+  // Software browser shortcut
+  const BROWSE_RE = /\b(show|browse|list|what|available)\b.*\b(software|apps|tools|packages)\b|\bwhat can (you|auri) install\b/i;
+  if (BROWSE_RE.test(text)) {
+    chatInput.value = '';
+    autoResizeTextarea();
+    updateSendBtnState();
+    showSoftwareBrowser();
+    return;
+  }
+
+  // Voice on-demand (replay last reply)
   const VOICE_RE = /\b(bolo|bolein|bol|batao|padhein|parho|parh|awaaz mein|voice mein|audio mein|read aloud|read out|speak|say it|out loud|sunao|suna do)\b/i;
   if (VOICE_RE.test(text)) {
     chatInput.value = '';
@@ -239,6 +345,10 @@ async function sendMessage() {
     }
     return;
   }
+
+  // Capture voice flag before clearing
+  const wasVoiceInput = !!window._lastInputWasVoice;
+  window._lastInputWasVoice = false;
 
   // Pre-flight admin / disk checks
   const INSTALL_RE = /\b(install|set ?up|download|laga do|install karo)\b/i;
@@ -254,10 +364,10 @@ async function sendMessage() {
     }
   }
 
-  // Switch to chat view before rendering
   showChat();
-
   renderMessage('user', text);
+  conversationManager.addMessage('user', text);
+  renderSidebar();
   addRecentItem(text);
 
   chatInput.value = '';
@@ -273,16 +383,24 @@ async function sendMessage() {
 
     const reply = res.response_text || res.response || res.message || JSON.stringify(res);
 
+    let finalReply;
     if (
       res.error === 'ollama_offline' ||
       (typeof reply === 'string' && /ollama.*not.*running|cannot.*reach.*ollama/i.test(reply))
     ) {
-      const offlineMsg = "Hmm, main apne brain tak nahi pahunch rahi! Ollama chal raha hai? 🧠 Try: ollama serve";
-      lastAuriReply = offlineMsg;
-      renderMessage('assistant', offlineMsg);
+      finalReply = "Hmm, main apne brain tak nahi pahunch rahi! Ollama chal raha hai? 🧠 Try: ollama serve";
     } else {
-      lastAuriReply = reply;
-      renderMessage('assistant', reply);
+      finalReply = reply;
+    }
+
+    lastAuriReply = finalReply;
+    renderMessage('assistant', finalReply);
+    conversationManager.addMessage('assistant', finalReply);
+    renderSidebar();
+
+    // Auto-speak if user sent message via voice
+    if (wasVoiceInput && window.tts && typeof window.tts.speak === 'function') {
+      window.tts.speak(finalReply);
     }
 
     if (res.task_id) {
@@ -301,7 +419,7 @@ async function sendMessage() {
 }
 
 // ── renderMessage ─────────────────────────────────────────────────────────────
-function renderMessage(role, content, timestamp) {
+function renderMessage(role, content, timestamp, skipScroll) {
   const wrapper = document.createElement('div');
   wrapper.className = `message ${role === 'user' ? 'user' : 'auri'}`;
 
@@ -316,8 +434,11 @@ function renderMessage(role, content, timestamp) {
 
   wrapper.appendChild(bubble);
   wrapper.appendChild(ts);
-  chatMessages.appendChild(wrapper);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+
+  const target = messagesInner || chatMessages;
+  target.appendChild(wrapper);
+
+  if (!skipScroll) chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 // ── showTyping ────────────────────────────────────────────────────────────────
@@ -328,8 +449,7 @@ function showTyping(show) {
 
 // ── connectProgressSocket ─────────────────────────────────────────────────────
 function connectProgressSocket(taskId) {
-  const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsBase = window.location.host ? `${wsProto}//${window.location.host}` : 'ws://127.0.0.1:8000';
+  const wsBase = 'ws://127.0.0.1:8000';
   const ws = new WebSocket(`${wsBase}/ws/progress/${taskId}`);
   let completed   = false;
   let dlFailCount = 0;
@@ -340,7 +460,6 @@ function connectProgressSocket(taskId) {
 
       if (data.step === 'download') {
         const msg = (data.message || '').toLowerCase();
-
         if (msg.includes('no internet') || msg.includes('connection error') ||
             msg.includes('network') || msg.includes('connectionerror')) {
           data.message = 'Oops! No internet connection 📡';
@@ -348,7 +467,6 @@ function connectProgressSocket(taskId) {
           renderMessage('assistant', "Looks like we're offline! Already downloaded files still work 📦");
           return;
         }
-
         if (msg.includes('retrying') || msg.includes('retry')) {
           dlFailCount++;
           const match = data.message.match(/\((\d+)\/(\d+)\)/);
@@ -358,7 +476,6 @@ function connectProgressSocket(taskId) {
           if (window.progressPanel) window.progressPanel.updateStep(data);
           return;
         }
-
         if ((data.status === 'failed' || data.status === 'error') && dlFailCount >= 3) {
           data.message = '❌ Download failed after 3 attempts';
           if (window.progressPanel) window.progressPanel.updateStep(data);
@@ -366,14 +483,11 @@ function connectProgressSocket(taskId) {
         }
       }
 
-      if (data.status === 'completed' || data.status === 'done') completed = true;
+      if (data.status === 'completed' || data.status === 'done' || data.status === 'failed' || data.status === 'error') completed = true;
       if (window.progressPanel && typeof window.progressPanel.updateStep === 'function') {
         window.progressPanel.updateStep(data);
       }
-      // Stash the backend's final message so progress-panel can render it
-      if (data.final_message) {
-        window.__auriFinalMsg = data.final_message;
-      }
+      if (data.final_message) window.__auriFinalMsg = data.final_message;
     } catch (_) {}
   };
 
@@ -394,7 +508,7 @@ function applyStatusUI(s) {
   const adminEl = document.getElementById('status-admin');
   if (adminEl) {
     const ok = !!s.is_admin;
-    adminEl.textContent = ok ? '● Admin: Active' : '● Admin: Inactive';
+    adminEl.textContent = ok ? '● Admin: Active' : '● Admin: Inactive — click to elevate';
     adminEl.className   = `status-item ${ok ? 'status-ok' : 'status-error'}`;
   }
 
@@ -426,30 +540,127 @@ async function updateStatusBar() {
   }
 }
 
-// ── Status-item click → tooltip ───────────────────────────────────────────────
+// ── Status-item click handlers ────────────────────────────────────────────────
 const STATUS_TIPS = {
   'status-ollama': 'Run: ollama serve in your terminal',
-  'status-admin':  'Restart AuriOS as Administrator',
   'status-disk':   'Free up space in Windows Settings → Storage',
   'status-python': "Say 'install python' to get started! 😊",
 };
 
-['status-ollama', 'status-admin', 'status-disk', 'status-python'].forEach(id => {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.style.position = 'relative';
-  el.addEventListener('click', () => {
-    if (!el.classList.contains('status-error')) return;
-    const existing = el.querySelector('.status-tooltip');
-    if (existing) { existing.remove(); return; }
-    document.querySelectorAll('.status-tooltip').forEach(t => t.remove());
-    const tip = document.createElement('div');
-    tip.className   = 'status-tooltip';
-    tip.textContent = STATUS_TIPS[id] || 'Check the logs.';
-    el.appendChild(tip);
-    setTimeout(() => tip.remove(), 4000);
+document.addEventListener('DOMContentLoaded', () => {
+  // Window controls
+  document.getElementById('btn-minimize')?.addEventListener('click', () => window.api.minimize());
+  document.getElementById('btn-maximize')?.addEventListener('click', () => window.api.maximize());
+  document.getElementById('btn-close')?.addEventListener('click', () => window.api.close());
+
+  // Send button
+  document.getElementById('send-btn')?.addEventListener('click', sendMessage);
+
+  // New chat button
+  document.getElementById('new-chat-btn')?.addEventListener('click', startNewChat);
+
+  // Browse software button
+  document.getElementById('browse-software-btn')?.addEventListener('click', showSoftwareBrowser);
+
+  // Sidebar collapse toggle
+  document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
+    document.getElementById('sidebar')?.classList.toggle('collapsed');
+  });
+
+  // Modal close button
+  document.getElementById('modal-close-btn')?.addEventListener('click', () => {
+    document.getElementById('modal-overlay')?.classList.add('hidden');
+  });
+  document.getElementById('modal-overlay')?.addEventListener('click', (e) => {
+    if (e.target === document.getElementById('modal-overlay')) {
+      document.getElementById('modal-overlay').classList.add('hidden');
+    }
+  });
+
+  // Admin status — trigger UAC elevation when inactive (red)
+  const adminEl = document.getElementById('status-admin');
+  if (adminEl) {
+    adminEl.addEventListener('click', () => {
+      if (adminEl.classList.contains('status-error')) {
+        if (window.api && typeof window.api.requestAdmin === 'function') {
+          window.api.requestAdmin();
+        }
+      }
+    });
+  }
+
+  // Status bar tooltips for non-admin items
+  ['status-ollama', 'status-disk', 'status-python'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', () => {
+      if (!el.classList.contains('status-error')) return;
+      const existing = el.querySelector('.status-tooltip');
+      if (existing) { existing.remove(); return; }
+      document.querySelectorAll('.status-tooltip').forEach(t => t.remove());
+      const tip = document.createElement('div');
+      tip.className   = 'status-tooltip';
+      tip.textContent = STATUS_TIPS[id] || 'Check the logs.';
+      el.appendChild(tip);
+      setTimeout(() => tip.remove(), 4000);
+    });
   });
 });
+
+// ── Software browser modal ────────────────────────────────────────────────────
+async function showSoftwareBrowser() {
+  const overlay   = document.getElementById('modal-overlay');
+  const container = document.getElementById('modal-content');
+  if (!overlay || !container) return;
+
+  container.innerHTML = `
+    <div class="sw-browser-header">
+      <h2>📦 Available Software</h2>
+      <p>Click Install to start the setup pipeline for any tool.</p>
+    </div>
+    <div class="sw-browser-grid sw-loading">Loading catalog…</div>
+  `;
+  overlay.classList.remove('hidden');
+
+  let catalog = [];
+  try {
+    catalog = await window.api.getAvailableSoftware();
+  } catch (_) {
+    container.querySelector('.sw-browser-grid').textContent = 'Could not load catalog. Is the backend running?';
+    return;
+  }
+
+  const grid = container.querySelector('.sw-browser-grid');
+  grid.className = 'sw-browser-grid';
+  grid.innerHTML = '';
+
+  catalog.forEach(item => {
+    const card = document.createElement('div');
+    card.className = 'sw-card';
+    const sizeLine = item.size_mb > 0 ? `<span>${item.size_mb} MB</span>` : '';
+    card.innerHTML = `
+      <div class="sw-card-name">${escapeHtml(item.display_name)}</div>
+      <div class="sw-card-meta">
+        <span>v${escapeHtml(item.version)}</span>
+        ${sizeLine}
+      </div>
+      <button class="sw-install-btn" data-slug="${escapeHtml(item.slug)}">Install</button>
+    `;
+    card.querySelector('.sw-install-btn').addEventListener('click', () => {
+      overlay.classList.add('hidden');
+      chatInput.value = `install ${item.slug}`;
+      autoResizeTextarea();
+      updateSendBtnState();
+      showChat();
+      sendMessage();
+    });
+    grid.appendChild(card);
+  });
+
+  if (catalog.length === 0) {
+    grid.textContent = 'No software found in catalog.';
+  }
+}
 
 // ── Clear chat ────────────────────────────────────────────────────────────────
 const clearBtn = document.getElementById('clear-chat-btn');
@@ -457,17 +668,19 @@ if (clearBtn) {
   clearBtn.addEventListener('click', async () => {
     if (!confirm('Clear all chat history?')) return;
     try { await window.api.clearHistory(); } catch (_) {}
-    chatMessages.innerHTML = '';
+    if (messagesInner) messagesInner.innerHTML = '';
+    conversationManager.create();
+    renderSidebar();
     showDashboard();
   });
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async () => {
-  // Set greeting on dashboard
-  const greetingEl = document.querySelector('.greeting-text');
+  const greetingEl    = document.querySelector('.greeting-text');
   const dashUsernameEl = document.getElementById('dash-username');
 
+  // Load profile
   try {
     const profile = await window.api.getProfile();
     if (profile && profile.user_name) {
@@ -481,29 +694,66 @@ if (clearBtn) {
     }
   } catch (_) {}
 
-  // Update greeting text with time of day
   if (greetingEl && dashUsernameEl) {
-    greetingEl.innerHTML = `${getGreeting()}, <span id="dash-username">${userName}</span> 👋`;
+    greetingEl.innerHTML = `${getGreeting()}, <span id="dash-username">${escapeHtml(userName)}</span> 👋`;
   }
 
-  // Load conversation history
-  try {
-    const history = await window.api.getHistory();
-    if (Array.isArray(history) && history.length > 0) {
-      history.forEach(m => renderMessage(m.role, m.content, m.timestamp));
-      // Populate recent items from user messages
-      history
-        .filter(m => m.role === 'user')
-        .slice(-5)
-        .reverse()
-        .forEach(m => addRecentItem(m.content));
+  // ── Conversation bootstrap ─────────────────────────────────────────────────
+  let activeConv = conversationManager.getActive();
+
+  if (!activeConv) {
+    // Try to import backend history into first conversation
+    try {
+      const history = await window.api.getHistory();
+      if (Array.isArray(history) && history.length > 0) {
+        activeConv = conversationManager.create();
+        // Seed title from first user message
+        const firstUser = history.find(m => m.role === 'user');
+        if (firstUser) {
+          const convs = conversationManager.load();
+          const conv = convs.find(c => c.id === activeConv.id);
+          if (conv) {
+            conv.title = firstUser.content.length > 42
+              ? firstUser.content.slice(0, 42) + '…'
+              : firstUser.content;
+            conv.messages = history.map(m => ({
+              role: m.role,
+              content: m.content,
+              timestamp: m.timestamp,
+            }));
+            conversationManager.save(convs);
+          }
+        }
+        history.forEach(m => renderMessage(m.role, m.content, m.timestamp, true));
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        // Populate recent items
+        history.filter(m => m.role === 'user').slice(-5).reverse().forEach(m => addRecentItem(m.content));
+        const lastAssist = [...history].reverse().find(m => m.role === 'assistant');
+        if (lastAssist) lastAuriReply = lastAssist.content;
+        showChat();
+      } else {
+        activeConv = conversationManager.create();
+        showDashboard();
+      }
+    } catch (_) {
+      activeConv = conversationManager.create();
+      showDashboard();
+    }
+  } else {
+    // Load from localStorage
+    if (activeConv.messages.length > 0) {
+      activeConv.messages.forEach(m => renderMessage(m.role, m.content, m.timestamp, true));
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      activeConv.messages.filter(m => m.role === 'user').slice(-5).reverse().forEach(m => addRecentItem(m.content));
+      const lastAssist = [...activeConv.messages].reverse().find(m => m.role === 'assistant');
+      if (lastAssist) lastAuriReply = lastAssist.content;
       showChat();
     } else {
       showDashboard();
     }
-  } catch (_) {
-    showDashboard();
   }
+
+  renderSidebar();
 
   // Status bar — immediate then every 30 s
   updateStatusBar();

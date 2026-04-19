@@ -1,11 +1,19 @@
-/* progress-panel.js — Installation progress side panel with real-time WebSocket updates */
+/* progress-panel.js — Sequential installation progress panel with overall percentage */
 
 (function () {
 
-  // ── Inject panel HTML into body ────────────────────────────────────────────
+  // ── Inject panel HTML ───────────────────────────────────────────────────────
   document.body.insertAdjacentHTML('beforeend', `
     <div id="progress-panel" class="panel-hidden">
-      <div id="panel-header">Installing: <span id="panel-preset-name"></span></div>
+      <div id="panel-header">
+        <div id="panel-title">Installing: <span id="panel-preset-name"></span></div>
+        <div id="panel-overall-wrap">
+          <div id="panel-overall-track">
+            <div id="panel-overall-fill"></div>
+          </div>
+          <span id="panel-pct">0%</span>
+        </div>
+      </div>
       <div id="panel-steps"></div>
       <div id="panel-footer">
         <button id="cancel-btn">✕ Cancel</button>
@@ -21,13 +29,6 @@
     in_progress: '⏳',
     done:        '✅',
     failed:      '❌',
-  };
-
-  const STATUS_LABELS = {
-    pending:     'Pending',
-    in_progress: 'In Progress…',
-    done:        'Done',
-    failed:      'Failed',
   };
 
   const STEP_DISPLAY_NAMES = {
@@ -52,41 +53,52 @@
 
   // ── State ───────────────────────────────────────────────────────────────────
 
-  let _steps      = [];      // [{id, name}, …]
-  let _stepStates = {};      // {stepId: 'pending'|'in_progress'|'done'|'failed'}
+  let _steps      = [];     // [{id, name}, …] in order
+  let _stepStates = {};     // {stepId: 'pending'|'in_progress'|'done'|'failed'}
+  let _stepProgress = {};   // {stepId: 0-100}
   let _taskId     = null;
 
   // ── DOM helpers ─────────────────────────────────────────────────────────────
 
-  const $panel   = () => document.getElementById('progress-panel');
-  const $steps   = () => document.getElementById('panel-steps');
-  const $counter = () => document.getElementById('panel-counter');
-  const $header  = () => document.getElementById('panel-header');
+  const $panel    = () => document.getElementById('progress-panel');
+  const $steps    = () => document.getElementById('panel-steps');
+  const $counter  = () => document.getElementById('panel-counter');
+  const $pct      = () => document.getElementById('panel-pct');
+  const $ovFill   = () => document.getElementById('panel-overall-fill');
 
   // ── showPanel ───────────────────────────────────────────────────────────────
   function showPanel(presetName, steps, taskId) {
     _taskId = taskId || null;
 
-    // Normalise steps to [{id, name}]
     _steps = steps.map(s =>
       typeof s === 'string'
         ? { id: s, name: STEP_DISPLAY_NAMES[s] || _titleCase(s) }
         : s
     );
-    _stepStates = {};
-    _steps.forEach(s => { _stepStates[s.id] = 'pending'; });
+    _stepStates   = {};
+    _stepProgress = {};
+    _steps.forEach(s => {
+      _stepStates[s.id]   = 'pending';
+      _stepProgress[s.id] = 0;
+    });
 
     // Reset header
-    $header().innerHTML = 'Installing: <span id="panel-preset-name"></span>';
     document.getElementById('panel-preset-name').textContent = presetName;
+    document.getElementById('panel-overall-fill').style.width = '0%';
+    document.getElementById('panel-pct').textContent = '0%';
+    const headerEl = document.getElementById('panel-title');
+    if (headerEl) {
+      headerEl.innerHTML = 'Installing: <span id="panel-preset-name"></span>';
+      document.getElementById('panel-preset-name').textContent = presetName;
+    }
 
     // Render step rows
     $steps().innerHTML = '';
     _steps.forEach(s => {
       const row = document.createElement('div');
-      row.className  = 'step-row';
-      row.id         = `step-row-${s.id}`;
-      row.innerHTML  = `
+      row.className = 'step-row step-pending';
+      row.id        = `step-row-${s.id}`;
+      row.innerHTML = `
         <div class="step-row-main">
           <span class="step-icon" id="step-icon-${s.id}">${STATUS_ICONS.pending}</span>
           <span class="step-name">${s.name}</span>
@@ -100,8 +112,9 @@
     });
 
     _updateCounter();
+    _updateOverall();
 
-    // Slide in (double rAF to ensure transition fires after class change)
+    // Slide in
     const p = $panel();
     p.classList.remove('panel-visible');
     p.classList.add('panel-hidden');
@@ -128,28 +141,31 @@
     }
 
     const mapped = STATUS_MAP[status] || 'pending';
-    _stepStates[step] = mapped;
 
-    const iconEl   = document.getElementById(`step-icon-${step}`);
-    const statusEl = document.getElementById(`step-status-${step}`);
-    const trackEl  = document.getElementById(`step-track-${step}`);
-    const fillEl   = document.getElementById(`step-fill-${step}`);
-
-    if (iconEl)   iconEl.textContent   = STATUS_ICONS[mapped]  || STATUS_ICONS.pending;
-    if (statusEl) statusEl.textContent = message               || STATUS_LABELS[mapped] || mapped;
-
-    if (trackEl && fillEl) {
-      if (mapped === 'in_progress' && progress != null) {
-        trackEl.style.display = 'block';
-        fillEl.style.width    = `${progress}%`;
-      } else {
-        trackEl.style.display = 'none';
+    // ── Enforce sequential order ────────────────────────────────────────────
+    // If this step is now active, forcefully complete all preceding steps.
+    if (mapped === 'in_progress') {
+      const idx = _steps.findIndex(s => s.id === step);
+      if (idx > 0) {
+        for (let i = 0; i < idx; i++) {
+          const prevId = _steps[i].id;
+          if (_stepStates[prevId] !== 'done' && _stepStates[prevId] !== 'failed') {
+            _applyStepState(prevId, 'done', 100, null);
+          }
+        }
       }
     }
 
-    _updateCounter();
+    // If this step is done, set its bar to 100%
+    const pct = (mapped === 'done') ? 100 : (progress != null ? progress : _stepProgress[step]);
+    _stepProgress[step] = pct;
+    _stepStates[step]   = mapped;
+    _applyStepState(step, mapped, pct, message);
 
-    // Check if every step has reached a terminal state
+    _updateCounter();
+    _updateOverall();
+
+    // Auto-complete check
     const allTerminal = _steps.length > 0 && _steps.every(
       s => _stepStates[s.id] === 'done' || _stepStates[s.id] === 'failed'
     );
@@ -159,29 +175,102 @@
     }
   }
 
+  // ── _applyStepState — mutate DOM for one step ───────────────────────────────
+  function _applyStepState(stepId, mapped, pct, message) {
+    const iconEl   = document.getElementById(`step-icon-${stepId}`);
+    const statusEl = document.getElementById(`step-status-${stepId}`);
+    const trackEl  = document.getElementById(`step-track-${stepId}`);
+    const fillEl   = document.getElementById(`step-fill-${stepId}`);
+    const rowEl    = document.getElementById(`step-row-${stepId}`);
+
+    if (!iconEl) return;
+
+    const LABELS = { pending: 'Pending', in_progress: 'Running…', done: 'Done', failed: 'Failed' };
+
+    iconEl.textContent   = STATUS_ICONS[mapped]  || STATUS_ICONS.pending;
+    statusEl.textContent = message               || LABELS[mapped] || mapped;
+
+    // Update row class for styling
+    if (rowEl) {
+      rowEl.className = `step-row step-${mapped}`;
+    }
+
+    // Progress bar visibility
+    if (trackEl && fillEl) {
+      if (mapped === 'in_progress' || mapped === 'done') {
+        trackEl.style.display = 'block';
+        fillEl.style.width    = `${pct ?? 0}%`;
+      } else {
+        trackEl.style.display = 'none';
+        fillEl.style.width    = '0%';
+      }
+    }
+  }
+
+  // ── _updateOverall — recalculate and render overall percentage ──────────────
+  function _updateOverall() {
+    const total = _steps.length;
+    if (total === 0) return;
+
+    let doneCount = 0;
+    let activeProgress = 0;
+
+    _steps.forEach(s => {
+      if (_stepStates[s.id] === 'done' || _stepStates[s.id] === 'failed') {
+        doneCount++;
+      } else if (_stepStates[s.id] === 'in_progress') {
+        activeProgress = (_stepProgress[s.id] || 0) / 100;
+      }
+    });
+
+    // Overall = completed steps + fraction of current step
+    const overall = Math.round(((doneCount + activeProgress) / total) * 100);
+
+    const fillEl = $ovFill();
+    const pctEl  = $pct();
+    if (fillEl) fillEl.style.width = `${overall}%`;
+    if (pctEl)  pctEl.textContent  = `${overall}%`;
+  }
+
+  // ── _updateCounter ──────────────────────────────────────────────────────────
+  function _updateCounter() {
+    const total = _steps.length;
+    const done  = _steps.filter(s => _stepStates[s.id] === 'done').length;
+    const el    = $counter();
+    if (el) el.textContent = `${done} of ${total} done`;
+  }
+
   // ── hidePanel ───────────────────────────────────────────────────────────────
   function hidePanel() {
     const p = $panel();
     p.classList.remove('panel-visible');
     p.classList.add('panel-hidden');
-    // Clear state after slide-out completes
     setTimeout(() => {
       $steps().innerHTML = '';
-      _steps      = [];
-      _stepStates = {};
-      _taskId     = null;
+      _steps        = [];
+      _stepStates   = {};
+      _stepProgress = {};
+      _taskId       = null;
     }, 350);
   }
 
   // ── _onAllDone ──────────────────────────────────────────────────────────────
   function _onAllDone(hadFailures) {
-    const h = $header();
-    if (hadFailures) {
-      h.textContent  = '⚠️ Completed with errors';
-      h.style.color  = '#f59e0b';
-    } else {
-      h.textContent  = '✅ All Done!';
-      h.style.color  = '#4ade80';
+    // Complete the overall bar
+    const fillEl = $ovFill();
+    const pctEl  = $pct();
+    if (fillEl) fillEl.style.width = '100%';
+    if (pctEl)  pctEl.textContent  = '100%';
+
+    const titleEl = document.getElementById('panel-title');
+    if (titleEl) {
+      if (hadFailures) {
+        titleEl.innerHTML = '⚠️ Completed with errors';
+        titleEl.style.color = '#f59e0b';
+      } else {
+        titleEl.innerHTML = '✅ All Done!';
+        titleEl.style.color = '#4ade80';
+      }
     }
 
     setTimeout(() => {
@@ -196,12 +285,10 @@
     }, 3000);
   }
 
-  // ── Cancel button ───────────────────────────────────────────────────────────
+  // ── Cancel ──────────────────────────────────────────────────────────────────
   document.getElementById('cancel-btn').addEventListener('click', async () => {
     if (_taskId) {
-      try {
-        await window.api.cancelTask(_taskId);
-      } catch (_) {}
+      try { await window.api.cancelTask(_taskId); } catch (_) {}
     }
     hidePanel();
     _emitBubble("Installation cancelled. Let me know when you're ready! 🙌");
@@ -209,17 +296,8 @@
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
-  function _updateCounter() {
-    const total = _steps.length;
-    const done  = _steps.filter(s => _stepStates[s.id] === 'done').length;
-    const el    = $counter();
-    if (el) el.textContent = `${done} of ${total} done`;
-  }
-
   function _emitBubble(text) {
-    if (typeof renderMessage === 'function') {
-      renderMessage('assistant', text);
-    }
+    if (typeof renderMessage === 'function') renderMessage('assistant', text);
   }
 
   function _titleCase(str) {

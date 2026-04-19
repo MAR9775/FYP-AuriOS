@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python setup.py)"
+      "Bash(python setup.py)",
+      "Bash(docker compose:*)"
     ]
   }
 }

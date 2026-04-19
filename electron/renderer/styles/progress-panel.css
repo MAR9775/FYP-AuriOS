@@ -14,26 +14,58 @@
   transition: transform 0.25s ease;
 }
 
-#progress-panel.panel-hidden {
-  transform: translateX(300px);
-}
+#progress-panel.panel-hidden  { transform: translateX(300px); }
+#progress-panel.panel-visible { transform: translateX(0); }
 
-#progress-panel.panel-visible {
-  transform: translateX(0);
-}
+/* ── Header ─────────────────────────────────────────────────────────────── */
 
 #panel-header {
-  padding: 16px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #f0f0f0;
+  padding: 14px 16px 12px;
   border-bottom: 1px solid #3d3d3d;
   flex-shrink: 0;
 }
 
-#panel-preset-name {
-  color: #c7365f;
+#panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f0f0f0;
+  margin-bottom: 10px;
 }
+
+#panel-preset-name { color: #c7365f; }
+
+/* Overall progress bar + percentage */
+#panel-overall-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#panel-overall-track {
+  flex: 1;
+  height: 5px;
+  background: #1a1a1a;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+#panel-overall-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #6366f1, #a78bfa);
+  border-radius: 3px;
+  transition: width 0.35s ease;
+}
+
+#panel-pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a78bfa;
+  min-width: 34px;
+  text-align: right;
+}
+
+/* ── Steps list ─────────────────────────────────────────────────────────── */
 
 #panel-steps {
   flex: 1;
@@ -45,6 +77,16 @@
   flex-direction: column;
   padding: 10px 16px;
   border-bottom: 1px solid #333;
+  transition: background 0.2s ease;
+}
+
+/* Active step gets a subtle highlight */
+.step-row.step-in_progress {
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.step-row.step-done {
+  opacity: 0.75;
 }
 
 .step-row-main {
@@ -64,27 +106,52 @@
   color: #d0d0d0;
 }
 
+.step-row.step-in_progress .step-name { color: #f0f0f0; font-weight: 500; }
+.step-row.step-done        .step-name { color: #a0a0a0; }
+
 .step-status-text {
   font-size: 11px;
-  color: #888;
+  color: #666;
 }
 
+.step-row.step-in_progress .step-status-text { color: #a78bfa; }
+.step-row.step-done        .step-status-text { color: #4ade80; }
+.step-row.step-failed      .step-status-text { color: #f87171; }
+
+/* ── Per-step progress bar ──────────────────────────────────────────────── */
+
 .step-progress-track {
-  margin-top: 6px;
+  margin-top: 7px;
   background: #1a1a1a;
-  height: 6px;
-  border-radius: 3px;
+  height: 4px;
+  border-radius: 2px;
   overflow: hidden;
   display: none;
 }
 
 .step-progress-fill {
   height: 100%;
-  background: #c7365f;
-  border-radius: 3px;
-  transition: width 0.25s ease;
+  border-radius: 2px;
+  transition: width 0.3s ease;
   width: 0%;
 }
+
+/* Active step: indigo/violet gradient */
+.step-row.step-in_progress .step-progress-fill {
+  background: linear-gradient(90deg, #6366f1, #a78bfa);
+}
+
+/* Done step: green */
+.step-row.step-done .step-progress-fill {
+  background: #4ade80;
+}
+
+/* Failed step: red */
+.step-row.step-failed .step-progress-fill {
+  background: #f87171;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
 
 #panel-footer {
   display: flex;
@@ -103,14 +170,12 @@
   padding: 5px 12px;
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.25s ease, color 0.25s ease;
+  transition: background 0.2s ease;
 }
 
-#cancel-btn:hover {
-  background: rgba(239, 68, 68, 0.1);
-}
+#cancel-btn:hover { background: rgba(239, 68, 68, 0.1); }
 
 #panel-counter {
-  color: #a0a0a0;
+  color: #666;
   font-size: 12px;
 }

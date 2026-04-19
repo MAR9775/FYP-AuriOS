@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://127.0.0.1:8000 ws://127.0.0.1:8000 ws: wss:;" />
+        content="default-src 'self' app://app; script-src 'self' app://app; style-src 'self' app://app 'unsafe-inline'; connect-src 'self' app://app http://127.0.0.1:8000 ws://127.0.0.1:8000 ws: wss:;" />
   <title>AuriOS</title>
   <link rel="stylesheet" href="styles/main.css" />
   <link rel="stylesheet" href="styles/agent.css" />
@@ -25,7 +25,7 @@
     </div>
 
     <!-- Profile pill -->
-    <div id="profile-pill" class="profile-pill" onclick="toggleProfileDropdown()">
+    <div id="profile-pill" class="profile-pill">
       <span id="profile-avatar" class="profile-avatar">A</span>
       <span id="profile-name">Profile</span>
       <span class="pill-caret">▾</span>
@@ -33,9 +33,9 @@
 
     <!-- Window controls -->
     <div id="window-controls">
-      <button class="wc-btn" id="btn-minimize" onclick="window.api.minimize()" title="Minimize">─</button>
-      <button class="wc-btn" id="btn-maximize" onclick="window.api.maximize()" title="Maximize">□</button>
-      <button class="wc-btn wc-close" id="btn-close" onclick="window.api.close()" title="Close to tray">✕</button>
+      <button class="wc-btn" id="btn-minimize" title="Minimize">─</button>
+      <button class="wc-btn" id="btn-maximize" title="Maximize">□</button>
+      <button class="wc-btn wc-close" id="btn-close" title="Close to tray">✕</button>
     </div>
   </div>
 
@@ -43,11 +43,11 @@
   <div id="profile-dropdown" class="dropdown hidden">
     <div class="dropdown-item dropdown-username" id="dd-username">Loading…</div>
     <div class="dropdown-separator"></div>
-    <div class="dropdown-item" onclick="showMyProfile()">👤 My Profile</div>
-    <div class="dropdown-item" onclick="showInstallHistory()">📋 Installation History</div>
-    <div class="dropdown-item" onclick="showPreferences()">⚙️ Preferences</div>
+    <div class="dropdown-item" data-action="my-profile">👤 My Profile</div>
+    <div class="dropdown-item" data-action="install-history">📋 Installation History</div>
+    <div class="dropdown-item" data-action="preferences">⚙️ Preferences</div>
     <div class="dropdown-separator"></div>
-    <div class="dropdown-item dropdown-danger" onclick="resetProfile()">🔄 Reset Profile</div>
+    <div class="dropdown-item dropdown-danger" data-action="reset">🔄 Reset Profile</div>
   </div>
 
   <!-- Modal overlay -->
@@ -61,103 +61,129 @@
   <!-- ── Main layout ───────────────────────────────────────────────────── -->
   <div id="main">
 
-    <!-- Avatar / agent panel -->
-    <div id="agent-panel">
-      <canvas id="avatar-canvas" width="200" height="200"></canvas>
-      <div id="agent-name">Auri</div>
-      <div id="agent-status">Ready</div>
+    <!-- ── Sidebar ────────────────────────────────────────────────────── -->
+    <div id="sidebar">
+      <div class="sidebar-top">
+        <div class="sidebar-avatar-row">
+          <canvas id="avatar-canvas" width="48" height="48"></canvas>
+          <div class="sidebar-auri-info">
+            <span id="agent-name">Auri</span>
+            <span id="agent-status">Ready</span>
+          </div>
+        </div>
+        <button id="new-chat-btn" class="new-chat-btn" title="Start a new chat">
+          <span class="new-chat-plus">+</span>
+          <span class="new-chat-label">New Chat</span>
+        </button>
+        <button id="browse-software-btn" class="browse-software-btn" title="Browse available software">
+          <span class="browse-software-icon">📦</span>
+          <span class="browse-software-label">Browse Software</span>
+        </button>
+      </div>
+
+      <div class="sidebar-section-label">Conversations</div>
+      <div id="chat-history-list" class="chat-history-list"></div>
+
+      <button id="sidebar-toggle" class="sidebar-toggle" title="Collapse sidebar">◀</button>
     </div>
 
-    <!-- Chat area -->
-    <div id="chat-panel">
+    <!-- ── Main content ──────────────────────────────────────────────── -->
+    <div id="main-content">
+      <div id="chat-panel">
 
-      <!-- ── Dashboard view ───────────────────────────────────────────── -->
-      <div id="dashboard-view" class="view-panel">
-        <div class="dashboard-inner">
+        <!-- ── Dashboard view ─────────────────────────────────────────── -->
+        <div id="dashboard-view" class="view-panel">
+          <div class="dashboard-inner">
 
-          <div class="dashboard-greeting">
-            <h1 class="greeting-text">Good morning, <span id="dash-username">there</span> 👋</h1>
-            <p class="greeting-sub">What would you like to set up today?</p>
+            <div class="dashboard-greeting">
+              <h1 class="greeting-text">Good morning, <span id="dash-username">there</span> 👋</h1>
+              <p class="greeting-sub">What would you like to set up today?</p>
+            </div>
+
+            <!-- Template cards grid -->
+            <div class="template-grid" id="template-grid">
+              <div class="template-card" data-prompt="Set up Python development environment">
+                <div class="template-icon">🐍</div>
+                <div class="template-body">
+                  <div class="template-title">Python Dev</div>
+                  <div class="template-desc">Install Python, pip, and dev tools</div>
+                </div>
+              </div>
+              <div class="template-card" data-prompt="Install machine learning tools like TensorFlow and PyTorch">
+                <div class="template-icon">🤖</div>
+                <div class="template-body">
+                  <div class="template-title">Machine Learning</div>
+                  <div class="template-desc">TensorFlow, PyTorch, scikit-learn</div>
+                </div>
+              </div>
+              <div class="template-card" data-prompt="Create a new React project with Node.js">
+                <div class="template-icon">⚛️</div>
+                <div class="template-body">
+                  <div class="template-title">React Project</div>
+                  <div class="template-desc">Node.js, npm, Create React App</div>
+                </div>
+              </div>
+              <div class="template-card" data-prompt="Configure a PostgreSQL database on my system">
+                <div class="template-icon">🗄️</div>
+                <div class="template-body">
+                  <div class="template-title">Database Setup</div>
+                  <div class="template-desc">PostgreSQL, MySQL, or SQLite</div>
+                </div>
+              </div>
+              <div class="template-card" data-prompt="Install Node.js and npm package manager">
+                <div class="template-icon">📦</div>
+                <div class="template-body">
+                  <div class="template-title">Node.js &amp; npm</div>
+                  <div class="template-desc">Latest LTS, npm, yarn</div>
+                </div>
+              </div>
+              <div class="template-card" data-prompt="Set up Git and configure my GitHub account">
+                <div class="template-icon">🔧</div>
+                <div class="template-body">
+                  <div class="template-title">Git &amp; GitHub</div>
+                  <div class="template-desc">Git, SSH keys, GitHub CLI</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recent history -->
+            <div class="recent-section" id="recent-section">
+              <div class="recent-header">Recent</div>
+              <div class="recent-list" id="recent-list"></div>
+            </div>
+
           </div>
-
-          <!-- Template cards grid -->
-          <div class="template-grid" id="template-grid">
-            <div class="template-card" data-prompt="Set up Python development environment">
-              <div class="template-icon">🐍</div>
-              <div class="template-body">
-                <div class="template-title">Python Dev</div>
-                <div class="template-desc">Install Python, pip, and dev tools</div>
-              </div>
-            </div>
-            <div class="template-card" data-prompt="Install machine learning tools like TensorFlow and PyTorch">
-              <div class="template-icon">🤖</div>
-              <div class="template-body">
-                <div class="template-title">Machine Learning</div>
-                <div class="template-desc">TensorFlow, PyTorch, scikit-learn</div>
-              </div>
-            </div>
-            <div class="template-card" data-prompt="Create a new React project with Node.js">
-              <div class="template-icon">⚛️</div>
-              <div class="template-body">
-                <div class="template-title">React Project</div>
-                <div class="template-desc">Node.js, npm, Create React App</div>
-              </div>
-            </div>
-            <div class="template-card" data-prompt="Configure a PostgreSQL database on my system">
-              <div class="template-icon">🗄️</div>
-              <div class="template-body">
-                <div class="template-title">Database Setup</div>
-                <div class="template-desc">PostgreSQL, MySQL, or SQLite</div>
-              </div>
-            </div>
-            <div class="template-card" data-prompt="Install Node.js and npm package manager">
-              <div class="template-icon">📦</div>
-              <div class="template-body">
-                <div class="template-title">Node.js &amp; npm</div>
-                <div class="template-desc">Latest LTS, npm, yarn</div>
-              </div>
-            </div>
-            <div class="template-card" data-prompt="Set up Git and configure my GitHub account">
-              <div class="template-icon">🔧</div>
-              <div class="template-body">
-                <div class="template-title">Git &amp; GitHub</div>
-                <div class="template-desc">Git, SSH keys, GitHub CLI</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Recent history -->
-          <div class="recent-section" id="recent-section">
-            <div class="recent-header">Recent</div>
-            <div class="recent-list" id="recent-list"></div>
-          </div>
-
         </div>
-      </div>
 
-      <!-- ── Chat messages ──────────────────────────────────────────────── -->
-      <div id="chat-messages" class="hidden" role="log" aria-live="polite"></div>
+        <!-- ── Chat messages ───────────────────────────────────────────── -->
+        <div id="chat-messages" class="hidden" role="log" aria-live="polite">
+          <div id="messages-inner"></div>
+        </div>
 
-      <!-- Typing indicator -->
-      <div id="typing-indicator" class="typing-indicator hidden">
-        <span>Auri is thinking… ⚙️</span>
-        <span class="dot-bounce">.</span>
-        <span class="dot-bounce" style="animation-delay:.2s">.</span>
-        <span class="dot-bounce" style="animation-delay:.4s">.</span>
-      </div>
+        <!-- Typing indicator -->
+        <div id="typing-indicator" class="typing-indicator hidden">
+          <span>Auri is thinking… ⚙️</span>
+          <span class="dot-bounce">.</span>
+          <span class="dot-bounce" style="animation-delay:.2s">.</span>
+          <span class="dot-bounce" style="animation-delay:.4s">.</span>
+        </div>
 
-      <!-- Suggestions dropdown -->
-      <div id="suggestions-dropdown" class="suggestions-dropdown hidden"></div>
+        <!-- Suggestions dropdown -->
+        <div id="suggestions-dropdown" class="suggestions-dropdown hidden"></div>
 
-      <!-- Input bar -->
-      <div id="input-bar">
-        <button id="mic-btn" class="icon-btn" title="Voice input" onclick="toggleVoice()">🎙️</button>
-        <textarea id="chat-input"
-                  rows="1"
-                  placeholder="Message Auri…"
-                  autocomplete="off"
-                  aria-label="Chat input"></textarea>
-        <button id="send-btn" class="icon-btn send-btn disabled" title="Send" onclick="sendMessage()">➤</button>
+        <!-- Input bar -->
+        <div id="input-bar">
+          <div id="input-bar-inner">
+            <button id="mic-btn" class="icon-btn" title="Voice input">🎙️</button>
+            <textarea id="chat-input"
+                      rows="1"
+                      placeholder="Message Auri…"
+                      autocomplete="off"
+                      aria-label="Chat input"></textarea>
+            <button id="send-btn" class="icon-btn send-btn disabled" title="Send">➤</button>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -166,7 +192,7 @@
   <!-- ── Status bar ────────────────────────────────────────────────────── -->
   <div id="statusbar">
     <span class="status-item" id="status-ollama">● Ollama: Checking...</span>
-    <span class="status-item" id="status-admin">● Admin: Checking...</span>
+    <span class="status-item" id="status-admin" title="Click to request admin privileges">● Admin: Checking...</span>
     <span class="status-item" id="status-disk">● Disk: ...</span>
     <span class="status-item" id="status-python">● Python: ...</span>
     <div id="statusbar-version">v1.1.0</div>

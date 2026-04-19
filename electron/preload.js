@@ -64,4 +64,14 @@ contextBridge.exposeInMainWorld('api', {
 
   // Update native window title (called after profile loads)
   setTitle: (title) => ipcRenderer.send('set-title', title),
+
+  // Request UAC elevation and relaunch as admin
+  requestAdmin: () => ipcRenderer.send('request-admin'),
+
+  // Splash screen: signal main process that animation is done
+  splashComplete: () => ipcRenderer.send('splash-complete'),
+
+  // Available software catalog from the GitHub repo
+  getAvailableSoftware: () =>
+    fetch(`${BASE}/available-software`).then((r) => r.json()),
 });

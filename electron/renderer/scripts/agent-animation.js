@@ -4,11 +4,9 @@ window.addEventListener('DOMContentLoaded', () => {
   const canvas = document.getElementById('avatar-canvas');
   if (!canvas) return;
 
-  // Override HTML dimensions to 240×240
+  // Set internal drawing resolution to 240×240; CSS controls display size
   canvas.width  = 240;
   canvas.height = 240;
-  canvas.style.width  = '240px';
-  canvas.style.height = '240px';
 
   const ctx = canvas.getContext('2d');
   const W   = 240;
