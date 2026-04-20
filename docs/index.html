@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuriOS</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        :root {
+            --bg: #0a0a0a;
+            --bg-2: #111111;
+            --bg-3: #1a1a1a;
+            --border: #27272a;
+            --text: #ffffff;
+            --muted: #71717a;
+            --accent: #6366f1;
+            --accent-dim: #4f46e5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        a {
+            text-decoration: none;
+        }
+
+        /* [1] NAVBAR */
+        .navbar {
+            position: sticky;
+            top: 0;
+            width: 100%;
+            background-color: var(--bg);
+            border-bottom: 1px solid var(--border);
+            padding: 0 40px;
+            height: 60px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .navbar-logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .navbar-right {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .version-badge {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--muted);
+            border: 1px solid var(--border);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .nav-download {
+            background-color: var(--accent);
+            color: #ffffff;
+            border-radius: 0px;
+            padding: 8px 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        /* [2] HERO */
+        .hero {
+            padding: 120px 40px 100px;
+            max-width: 860px;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: left;
+        }
+
+        .hero-eyebrow {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+        }
+
+        .hero-title {
+            font-weight: 800;
+            font-size: 64px;
+            color: #ffffff;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
+        }
+
+        .hero-subtitle {
+            font-weight: 400;
+            font-size: 18px;
+            color: var(--muted);
+            max-width: 560px;
+            line-height: 1.7;
+            margin-top: 24px;
+        }
+
+        .hero-buttons {
+            margin-top: 40px;
+            display: flex;
+            flex-direction: row;
+            gap: 16px;
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            color: #ffffff;
+            padding: 14px 28px;
+            border-radius: 0px;
+            font-weight: 500;
+            font-size: 16px;
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 1px solid var(--border);
+            color: #a1a1aa;
+            padding: 14px 28px;
+            border-radius: 0px;
+            font-weight: 500;
+            font-size: 16px;
+        }
+
+        .hero-meta {
+            margin-top: 16px;
+            font-size: 13px;
+            color: #3f3f46;
+            font-weight: 400;
+        }
+
+        /* [3] TERMINAL BLOCK */
+        .terminal-container {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 0 40px 100px;
+        }
+
+        .terminal {
+            background-color: var(--bg-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .terminal-top {
+            background-color: var(--bg-3);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .dot-red { background-color: #ef4444; }
+        .dot-yellow { background-color: #f59e0b; }
+        .dot-green { background-color: #22c55e; }
+
+        .terminal-body {
+            padding: 24px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+            white-space: pre-wrap;
+        }
+
+        /* [4] HOW IT WORKS */
+        .how-it-works {
+            padding: 100px 40px;
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        .section-eyebrow {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+        }
+
+        .section-title {
+            font-weight: 700;
+            font-size: 42px;
+            color: #ffffff;
+            letter-spacing: -0.02em;
+            margin-bottom: 40px;
+        }
+
+        .step {
+            border-top: 1px solid var(--border);
+            padding: 32px 0;
+            display: grid;
+            grid-template-columns: 80px 1fr;
+        }
+
+        .step-number {
+            font-weight: 800;
+            font-size: 48px;
+            color: var(--border);
+        }
+
+        .step-title {
+            font-weight: 600;
+            font-size: 20px;
+            color: #ffffff;
+        }
+
+        .step-desc {
+            font-weight: 400;
+            font-size: 16px;
+            color: var(--muted);
+            line-height: 1.6;
+            margin-top: 8px;
+        }
+
+        /* [5] TECH STACK */
+        .tech-stack {
+            padding: 80px 40px;
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        .tech-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .badge {
+            border: 1px solid var(--border);
+            padding: 8px 16px;
+            border-radius: 0px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: #a1a1aa;
+        }
+
+        /* [6] REQUIREMENTS */
+        .requirements {
+            padding: 80px 40px;
+            max-width: 860px;
+            margin: 0 auto;
+        }
+
+        .req-item {
+            border-top: 1px solid var(--border);
+            padding: 24px 0;
+            display: flex;
+            gap: 16px;
+        }
+
+        .req-icon {
+            color: var(--accent);
+            font-weight: 500;
+            font-size: 20px;
+        }
+
+        .req-title {
+            font-weight: 600;
+            font-size: 17px;
+            color: #ffffff;
+        }
+
+        .req-desc {
+            font-weight: 400;
+            font-size: 15px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+
+        /* [7] DOWNLOAD CTA */
+        .cta {
+            background-color: var(--accent);
+            padding: 80px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+            width: 100%;
+        }
+
+        .cta-title {
+            font-weight: 700;
+            font-size: 32px;
+            color: #ffffff;
+        }
+
+        .cta-subtitle {
+            font-weight: 400;
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 8px;
+        }
+
+        .cta-right {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .btn-cta {
+            background-color: #ffffff;
+            color: #0a0a0a;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 0px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            text-align: center;
+            display: inline-block;
+        }
+
+        .cta-meta {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.5);
+            text-align: right;
+            margin-top: 8px;
+        }
+
+        /* [8] FOOTER */
+        .footer {
+            background-color: var(--bg);
+            border-top: 1px solid var(--border);
+            padding: 32px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .footer-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            color: #3f3f46;
+        }
+
+        /* MOBILE RESPONSIVE */
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 0 24px;
+            }
+
+            .hero {
+                padding: 80px 24px 60px;
+            }
+
+            .hero-title {
+                font-size: 36px;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+            }
+
+            .terminal-container {
+                padding: 0 24px 60px;
+            }
+
+            .how-it-works,
+            .tech-stack,
+            .requirements {
+                padding: 60px 24px;
+            }
+
+            .cta {
+                padding: 60px 24px;
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .cta-right {
+                align-items: center;
+            }
+
+            .cta-meta {
+                text-align: center;
+            }
+
+            .step {
+                grid-template-columns: 40px 1fr;
+            }
+
+            .step-number {
+                font-size: 32px;
+            }
+
+            .section-title {
+                font-size: 30px;
+            }
+            
+            .footer {
+                padding: 32px 24px;
+                flex-direction: column;
+                text-align: center;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- [1] NAVBAR -->
+    <nav class="navbar">
+        <div class="navbar-logo">AuriOS</div>
+        <div class="navbar-right">
+            <span class="version-badge">v1.1.0</span>
+            <a href="https://github.com/MAR9775/AuriOS/releases/latest" class="nav-download">Download</a>
+        </div>
+    </nav>
+
+    <!-- [2] HERO -->
+    <section class="hero">
+        <div class="hero-eyebrow">FINAL YEAR PROJECT — FAST-NUCES PESHAWAR</div>
+        <h1 class="hero-title">Set up your dev environment. Just ask.</h1>
+        <p class="hero-subtitle">Type or speak what you need. AuriOS handles detection, download, installation, and PATH configuration automatically. No wizards. No terminal. No errors.</p>
+        <div class="hero-buttons">
+            <a href="https://github.com/MAR9775/AuriOS/releases/latest" class="btn-primary">Download for Windows (.exe)</a>
+            <a href="https://github.com/MAR9775/AuriOS" class="btn-secondary">View Source on GitHub</a>
+        </div>
+        <div class="hero-meta">Windows 10/11 only  ·  Requires Ollama  ·  Free</div>
+    </section>
+
+    <!-- [3] TERMINAL BLOCK -->
+    <div class="terminal-container">
+        <div class="terminal">
+            <div class="terminal-top">
+                <div class="terminal-dot dot-red"></div>
+                <div class="terminal-dot dot-yellow"></div>
+                <div class="terminal-dot dot-green"></div>
+            </div>
+            <div class="terminal-body"><span style="color:#71717a">$</span> <span style="color:#ffffff">"install python and set up a data science environment"</span>
+
+<span style="color:#71717a">Detecting installed software</span>
+<span style="color:#22c55e">  ✓ done</span>
+
+<span style="color:#71717a">Downloading Python 3.11.9</span>
+<span style="color:#6366f1">  ↓ 27.4 MB</span>
+<span style="color:#22c55e">  ✓</span>
+
+<span style="color:#71717a">Running silent installer</span>
+<span style="color:#22c55e">  ✓ exit code 0</span>
+
+<span style="color:#71717a">Configuring PATH via registry</span>
+<span style="color:#22c55e">  ✓ updated</span>
+
+<span style="color:#71717a">Validating installation</span>
+<span style="color:#22c55e">  ✓ python 3.11.9 detected</span>
+
+<span style="color:#71717a">Creating project environment</span>
+<span style="color:#22c55e">  ✓ ~/AuriOS_Projects/my_project/</span>
+
+<span style="color:#22c55e">✓</span> <span style="color:#ffffff">Python ready. pip ready. venv active. 
+All done in 3m 42s.</span></div>
+        </div>
+    </div>
+
+    <!-- [4] HOW IT WORKS -->
+    <section class="how-it-works">
+        <div class="section-eyebrow">THE PIPELINE</div>
+        <h2 class="section-title">From prompt to working environment.</h2>
+        
+        <div class="step">
+            <div class="step-number">01</div>
+            <div>
+                <div class="step-title">You describe what you need</div>
+                <div class="step-desc">Type naturally or use your microphone. AuriOS understands English, Urdu, and Hinglish.</div>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-number">02</div>
+            <div>
+                <div class="step-title">Intent is parsed locally</div>
+                <div class="step-desc">A rule-based parser with 160+ patterns handles common requests. Ollama (llama3.2) handles the rest. No data leaves your machine.</div>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-number">03</div>
+            <div>
+                <div class="step-title">Six agents execute the pipeline</div>
+                <div class="step-desc">Detection → Download → Install → Configure → Validate → Environment. Each step streams live progress to your screen.</div>
+            </div>
+        </div>
+        
+        <div class="step">
+            <div class="step-number">04</div>
+            <div>
+                <div class="step-title">Your environment is ready</div>
+                <div class="step-desc">Software installed, PATH configured, virtual environment created. Installed apps launch automatically.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- [5] TECH STACK -->
+    <section class="tech-stack">
+        <div class="section-eyebrow">BUILT WITH</div>
+        <h2 class="section-title">The stack behind AuriOS.</h2>
+        <div class="tech-badges">
+            <div class="badge">Electron v41</div>
+            <div class="badge">Python 3</div>
+            <div class="badge">FastAPI</div>
+            <div class="badge">Ollama llama3.2</div>
+            <div class="badge">SQLite</div>
+            <div class="badge">NSIS</div>
+            <div class="badge">WebSocket</div>
+            <div class="badge">Vanilla JS</div>
+        </div>
+    </section>
+
+    <!-- [6] REQUIREMENTS -->
+    <section class="requirements">
+        <div class="section-eyebrow">BEFORE YOU INSTALL</div>
+        <h2 class="section-title">Prerequisites.</h2>
+        
+        <div class="req-item">
+            <div class="req-icon">→</div>
+            <div>
+                <div class="req-title">Windows 10 or 11 (64-bit)</div>
+                <div class="req-desc">AuriOS uses Windows-specific APIs: registry writes, UAC elevation, and silent EXE/MSI installer flags.</div>
+            </div>
+        </div>
+        
+        <div class="req-item">
+            <div class="req-icon">→</div>
+            <div>
+                <div class="req-title">Ollama installed and running</div>
+                <div class="req-desc">Download from ollama.ai and run: ollama pull llama3.2<br>AuriOS will not start without Ollama on port 11434.</div>
+            </div>
+        </div>
+        
+        <div class="req-item">
+            <div class="req-icon">→</div>
+            <div>
+                <div class="req-title">Administrator privileges</div>
+                <div class="req-desc">Required for system-level PATH configuration and silent software installation.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- [7] DOWNLOAD CTA -->
+    <section class="cta">
+        <div>
+            <div class="cta-title">AuriOS v1.1.0</div>
+            <div class="cta-subtitle">Windows Installer · 64-bit · Free</div>
+        </div>
+        <div class="cta-right">
+            <a href="https://github.com/MAR9775/AuriOS/releases/latest" class="btn-cta">Download .exe</a>
+            <div class="cta-meta">No account required · No telemetry · Open source</div>
+        </div>
+    </section>
+
+    <!-- [8] FOOTER -->
+    <footer class="footer">
+        <div class="footer-text">AuriOS — Built by The Automators</div>
+        <div class="footer-text">FAST-NUCES Peshawar · 2025</div>
+    </footer>
+
+</body>
+</html>
