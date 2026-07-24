@@ -16,7 +16,7 @@
       </div>
       <div id="panel-steps"></div>
       <div id="panel-footer">
-        <button id="cancel-btn">✕ Cancel</button>
+        <button id="cancel-btn">Cancel</button>
         <span id="panel-counter">0 of 0 done</span>
       </div>
     </div>
@@ -25,18 +25,18 @@
   // ── Constants ───────────────────────────────────────────────────────────────
 
   const STATUS_ICONS = {
-    pending:     '⬜',
-    in_progress: '⏳',
-    done:        '✅',
-    failed:      '❌',
+    pending:     '<svg width="14" height="14" fill="none" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/></svg>',
+    in_progress: '<svg width="14" height="14" fill="none" stroke="#f97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    done:        '<svg width="14" height="14" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    failed:      '<svg width="14" height="14" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
   };
 
   const STEP_DISPLAY_NAMES = {
-    detection:   'System Check',
-    download:    'Download',
-    install:     'Install',
-    configure:   'Configure',
-    validate:    'Validate',
+    detection:   'Resolving package...',
+    download:    'Downloading...',
+    install:     'Installing silently...',
+    configure:   'Finalizing setup...',
+    validate:    'Verifying installation...',
     environment: 'Environment Setup',
   };
 
@@ -83,14 +83,16 @@
     });
 
     // Reset header
-    document.getElementById('panel-preset-name').textContent = presetName;
-    document.getElementById('panel-overall-fill').style.width = '0%';
-    document.getElementById('panel-pct').textContent = '0%';
     const headerEl = document.getElementById('panel-title');
     if (headerEl) {
+      headerEl.style.color = ''; // Reset color from previous runs
       headerEl.innerHTML = 'Installing: <span id="panel-preset-name"></span>';
       document.getElementById('panel-preset-name').textContent = presetName;
     }
+    const overallFill = document.getElementById('panel-overall-fill');
+    if (overallFill) overallFill.style.width = '0%';
+    const pctEl = document.getElementById('panel-pct');
+    if (pctEl) pctEl.textContent = '0%';
 
     // Render step rows
     $steps().innerHTML = '';
@@ -118,6 +120,7 @@
     const p = $panel();
     p.classList.remove('panel-visible');
     p.classList.add('panel-hidden');
+    document.body.classList.add('has-progress');
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         p.classList.remove('panel-hidden');
@@ -130,7 +133,7 @@
   function updateStep(data) {
     const { step, status, progress, message } = data;
 
-    // Terminal signal with no specific step → all done or all failed
+    // Terminal signal with no specific step -- all done or all failed
     if (!step) {
       if (status === 'done' || status === 'completed') {
         _onAllDone(false);
@@ -158,14 +161,14 @@
       }
     }
 
-    // If this step is done, set its bar to 100%
-    const pct = (mapped === 'done') ? 100 : (progress != null ? progress : _stepProgress[step]);
+    // If this step is done, set its bar to 100%. If running, show an indeterminate 50%
+    const pct = (mapped === 'done') ? 100 : (mapped === 'in_progress' ? 50 : 0);
     _stepProgress[step] = pct;
     _stepStates[step]   = mapped;
     _applyStepState(step, mapped, pct, message);
 
     _updateCounter();
-    _updateOverall();
+    _updateOverall(progress);
 
     // Auto-complete check
     const allTerminal = _steps.length > 0 && _steps.every(
@@ -189,7 +192,7 @@
 
     const LABELS = { pending: 'Pending', in_progress: 'Running…', done: 'Done', failed: 'Failed' };
 
-    iconEl.textContent   = STATUS_ICONS[mapped]  || STATUS_ICONS.pending;
+    iconEl.innerHTML     = STATUS_ICONS[mapped]  || STATUS_ICONS.pending;
     statusEl.textContent = message               || LABELS[mapped] || mapped;
 
     // Update row class for styling
@@ -210,23 +213,13 @@
   }
 
   // ── _updateOverall — recalculate and render overall percentage ──────────────
-  function _updateOverall() {
+  function _updateOverall(backendProgress) {
     const total = _steps.length;
     if (total === 0) return;
 
-    let doneCount = 0;
-    let activeProgress = 0;
-
-    _steps.forEach(s => {
-      if (_stepStates[s.id] === 'done' || _stepStates[s.id] === 'failed') {
-        doneCount++;
-      } else if (_stepStates[s.id] === 'in_progress') {
-        activeProgress = (_stepProgress[s.id] || 0) / 100;
-      }
-    });
-
-    // Overall = completed steps + fraction of current step
-    const overall = Math.round(((doneCount + activeProgress) / total) * 100);
+    let overall = backendProgress != null ? backendProgress : 0;
+    if (overall > 100) overall = 100;
+    if (overall < 0) overall = 0;
 
     const fillEl = $ovFill();
     const pctEl  = $pct();
@@ -247,6 +240,7 @@
     const p = $panel();
     p.classList.remove('panel-visible');
     p.classList.add('panel-hidden');
+    document.body.classList.remove('has-progress');
     setTimeout(() => {
       $steps().innerHTML = '';
       _steps        = [];
@@ -258,6 +252,16 @@
 
   // ── _onAllDone ──────────────────────────────────────────────────────────────
   function _onAllDone(hadFailures) {
+    if (!hadFailures) {
+      _steps.forEach(s => {
+        if (_stepStates[s.id] !== 'done' && _stepStates[s.id] !== 'failed') {
+          _stepStates[s.id] = 'done';
+          _stepProgress[s.id] = 100;
+          _applyStepState(s.id, 'done', 100, null);
+        }
+      });
+    }
+
     // Complete the overall bar
     const fillEl = $ovFill();
     const pctEl  = $pct();
@@ -267,10 +271,10 @@
     const titleEl = document.getElementById('panel-title');
     if (titleEl) {
       if (hadFailures) {
-        titleEl.innerHTML = '⚠️ Completed with errors';
+        titleEl.innerHTML = '<svg width="14" height="14" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true" style="vertical-align:-2px;margin-right:6px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Completed with errors';
         titleEl.style.color = '#f59e0b';
       } else {
-        titleEl.innerHTML = '✅ All Done!';
+        titleEl.innerHTML = '<svg width="14" height="14" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true" style="vertical-align:-2px;margin-right:6px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>All Done!';
         titleEl.style.color = '#4ade80';
       }
     }
@@ -280,8 +284,8 @@
       const finalMsg = window.__auriFinalMsg;
       _emitBubble(
         hadFailures
-          ? (finalMsg || 'Installation finished with some issues. Check the logs for details. 🔍')
-          : (finalMsg || "Everything's set up and ready to go! Let me know what you'd like to build. 🚀")
+          ? (finalMsg || 'Installation finished with some issues. Check the logs for details.')
+          : (finalMsg || "Everything is set up and ready to go. Let me know what you'd like to build.")
       );
       window.__auriFinalMsg = null;
     }, 3000);
@@ -293,7 +297,7 @@
       try { await window.api.cancelTask(_taskId); } catch (_) {}
     }
     hidePanel();
-    _emitBubble("Installation cancelled. Let me know when you're ready! 🙌");
+    _emitBubble("Installation cancelled. Let me know when you're ready.");
   });
 
   // ── Helpers ─────────────────────────────────────────────────────────────────

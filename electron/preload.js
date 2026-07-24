@@ -16,8 +16,11 @@ contextBridge.exposeInMainWorld('api', {
     fetch(`${BASE}/history`).then((r) => r.json()),
 
   // Profile
-  getProfile: () =>
-    fetch(`${BASE}/profile`).then((r) => r.json()),
+  getProfile: (token) => {
+    return fetch(`${BASE}/profile`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    }).then((r) => r.json());
+  },
 
   // System status
   getStatus: () =>
@@ -39,12 +42,28 @@ contextBridge.exposeInMainWorld('api', {
     fetch(`${BASE}/preferences`).then((r) => r.json()),
 
   // Profile (write + reset)
-  postProfile: (data) =>
-    fetch(`${BASE}/profile`, {
+  postProfile: (data, token) => {
+    return fetch(`${BASE}/profile`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(data),
+    }).then((r) => r.json());
+  },
+
+  changePassword: (data) =>
+    fetch(`${BASE}/auth/change-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
-    }).then((r) => r.json()),
+    }).then((r) => {
+      if (!r.ok) {
+        return r.json().then(err => { throw new Error(err.detail || 'Failed to change password'); });
+      }
+      return r.json();
+    }),
 
   resetProfile: () =>
     fetch(`${BASE}/profile/reset`, { method: 'POST' }).then((r) => r.json()),
@@ -67,9 +86,6 @@ contextBridge.exposeInMainWorld('api', {
 
   // Request UAC elevation and relaunch as admin
   requestAdmin: () => ipcRenderer.send('request-admin'),
-
-  // Splash screen: signal main process that animation is done
-  splashComplete: () => ipcRenderer.send('splash-complete'),
 
   // Available software catalog from the GitHub repo
   getAvailableSoftware: () =>

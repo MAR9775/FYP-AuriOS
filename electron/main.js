@@ -119,6 +119,7 @@ async function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      experimentalFeatures: true,
     },
     show: false,
   });
@@ -147,10 +148,14 @@ async function createWindow() {
     return permission === 'media' || permission === 'microphone';
   });
 
-  // Save bounds on resize / move
+  // Save bounds on resize / move with 500ms debounce
+  let boundsTimeout = null;
   const persistBounds = () => {
     if (!mainWindow || mainWindow.isMinimized() || mainWindow.isMaximized()) return;
-    saveBounds(mainWindow.getBounds());
+    if (boundsTimeout) clearTimeout(boundsTimeout);
+    boundsTimeout = setTimeout(() => {
+      saveBounds(mainWindow.getBounds());
+    }, 500);
   };
   mainWindow.on('resize', persistBounds);
   mainWindow.on('move', persistBounds);
@@ -227,6 +232,10 @@ ipcMain.on('request-admin', () => {
   }).unref();
   setTimeout(() => { app.isQuitting = true; app.quit(); }, 400);
 });
+
+// Enable Web Speech API in Electron's Chromium renderer
+app.commandLine.appendSwitch('enable-features', 'WebSpeechAPI,AudioServiceOutOfProcess');
+app.commandLine.appendSwitch('enable-speech-input');
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
 

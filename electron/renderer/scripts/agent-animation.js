@@ -72,7 +72,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // ── Helpers ───────────────────────────────────────────────────────────────
   function lerp(a, b, t) { return a + (b - a) * t; }
 
-  // Color gradient: #6366f1 → #a78bfa (indigo to violet)
+  // Color gradient: #6366f1 -> #a78bfa (indigo to violet)
   function gradientColor(t) {
     const r = Math.round(lerp(0x63, 0xa7, t));
     const g = Math.round(lerp(0x66, 0x8b, t));
@@ -187,7 +187,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   draw();
 
-  // ── Click canvas → toggle mic ─────────────────────────────────────────────
+  // ── Click canvas to toggle mic ────────────────────────────────────────────
   canvas.style.cursor = 'pointer';
   canvas.addEventListener('click', () => {
     if (window.voice && typeof window.voice.toggleListening === 'function') {

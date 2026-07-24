@@ -41,21 +41,24 @@ document.addEventListener('DOMContentLoaded', () => {
     startBtn.textContent = 'Setting up…';
 
     try {
+      const _token = localStorage.getItem('aurios_auth_token') || '';
+      const _authHeaders = { 'Content-Type': 'application/json', ...(_token ? { 'Authorization': `Bearer ${_token}` } : {}) };
+
       await fetch(`${BASE}/profile`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: _authHeaders,
         body: JSON.stringify({ user_name: name, experience, interests }),
       });
 
       await fetch(`${BASE}/preferences`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: _authHeaders,
         body: JSON.stringify({ key: 'onboarded', value: 'true' }),
       });
 
       await fetch(`${BASE}/preferences`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: _authHeaders,
         body: JSON.stringify({ key: 'setup_date', value: new Date().toISOString() }),
       });
 
@@ -74,8 +77,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }, 500);
     } catch (err) {
       startBtn.disabled    = false;
-      startBtn.textContent = 'Get Started →';
+      startBtn.innerHTML = 'Get Started <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>';
       console.error('[AuriOS] Onboarding save error:', err);
+      // Show visible error to the user instead of failing silently
+      let errEl = document.getElementById('onboarding-save-error');
+      if (!errEl) {
+        errEl = document.createElement('div');
+        errEl.id = 'onboarding-save-error';
+        errEl.style.cssText = 'color:#f87171;font-size:0.85rem;margin-top:10px;text-align:center;';
+        startBtn.parentNode.insertBefore(errEl, startBtn.nextSibling);
+      }
+      errEl.textContent = 'Could not save your profile. Please check your connection and try again.';
     }
   });
 });

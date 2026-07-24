@@ -11,53 +11,119 @@
   <link rel="stylesheet" href="styles/components.css" />
   <link rel="stylesheet" href="styles/progress-panel.css" />
   <link rel="stylesheet" href="styles/splash.css" />
+  <link rel="stylesheet" href="styles/auth.css" />
   <link rel="stylesheet" href="styles/onboarding.css" />
+  <link rel="stylesheet" href="styles/admin.css" />
 </head>
 <body>
 <div id="splash-overlay">
-<div class="splash-container">
-    <div class="parallax-scene">
-      <img src="assets/abstract_core.png" class="core-layer" alt="Abstract Core" />
-      <div class="light-scan"></div>
-      <div class="ui-layer">
-        <!-- Abstract HUD structural lines forming over the scene -->
-        <svg class="ui-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-          <path class="ui-line" d="M 0 60 L 15 60 L 25 45 L 75 45 L 85 60 L 100 60" />
-          <path class="ui-line" d="M 15 60 L 15 70" />
-          <path class="ui-line" d="M 85 60 L 85 70" />
-          <circle class="ui-node" cx="15" cy="60" r="0.4" />
-          <circle class="ui-node" cx="25" cy="45" r="0.4" />
-          <circle class="ui-node" cx="75" cy="45" r="0.4" />
-          <circle class="ui-node" cx="85" cy="60" r="0.4" />
-        </svg>
+  <!-- Central alignment grid container -->
+  <div id="splash-center-anchor">
+    
+    <!-- Line Draw -->
+    <div id="intro-line"></div>
+    
+    <!-- Block Build -->
+    <div id="intro-blocks">
+      <div class="intro-block block-l3"></div>
+      <div class="intro-block block-l2"></div>
+      <div class="intro-block block-l1"></div>
+      <div class="intro-block block-r1"></div>
+      <div class="intro-block block-r2"></div>
+      <div class="intro-block block-r3"></div>
+    </div>
+
+    <!-- Text Reveal & Lock -->
+    <div id="intro-text-group">
+      <div id="splash-title-chars">
+        <span class="char" id="char-1">A</span><span class="char" id="char-2">u</span><span class="char" id="char-3">r</span><span class="char" id="char-4">i</span><span class="char" id="char-5">O</span><span class="char" id="char-6">S</span>
       </div>
+      <div id="splash-underline"></div>
+      <div id="splash-subtitle"></div>
     </div>
     
-    <div class="splash-vignette"></div>
+  </div>
+</div>
 
-    <div class="splash-foreground-content">
-      <div class="splash-logo-block">
-        <div class="splash-logo-name">AuriOS</div>
-        <div class="splash-logo-sub">System Initialization</div>
+<!-- ── Authentication View ─────────────────────────────────────────────── -->
+<div id="auth-view" class="hidden" style="transition: opacity 0.5s ease">
+  <div class="auth-wrapper">
+    <div class="auth-card">
+      <div class="auth-header">
+        <h1 class="auth-title">AuriOS</h1>
+        <p class="auth-subtitle">Welcome back! Please login or sign up.</p>
       </div>
 
-      <div class="splash-status-line" id="splash-status-line">Starting up…</div>
+      <div class="auth-tabs">
+        <div class="auth-tab active" id="tab-login">Login</div>
+        <div class="auth-tab" id="tab-signup">Sign Up</div>
+      </div>
 
-      <div class="splash-progress-wrap">
-        <div class="splash-progress-track">
-          <div class="splash-progress-fill" id="splash-progress-fill"></div>
+      <div id="auth-error-msg" class="auth-message hidden"></div>
+
+      <!-- Login Form -->
+      <form id="login-form" class="auth-form">
+        <div class="auth-input-group">
+          <div class="input-wrapper">
+            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <input type="email" id="login-email" class="auth-input" placeholder="Email address" autocomplete="email" required />
+          </div>
         </div>
-      </div>
+        <div class="auth-input-group">
+          <div class="input-wrapper">
+            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <input type="password" id="login-password" class="auth-input" placeholder="Password" autocomplete="current-password" required />
+            <button type="button" class="password-toggle" tabindex="-1" title="Show/Hide Password">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="auth-btn" id="login-btn">Login</button>
+      </form>
+
+      <!-- Signup Form -->
+      <form id="signup-form" class="auth-form hidden">
+        <div class="auth-input-group">
+          <div class="input-wrapper">
+            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <input type="text" id="signup-name" class="auth-input" placeholder="Full Name" autocomplete="name" required />
+          </div>
+        </div>
+        <div class="auth-input-group">
+          <div class="input-wrapper">
+            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+            <input type="email" id="signup-email" class="auth-input" placeholder="Email address" autocomplete="email" required />
+          </div>
+        </div>
+        <div class="auth-input-group">
+          <div class="input-wrapper">
+            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <input type="password" id="signup-password" class="auth-input" placeholder="Create Password" autocomplete="new-password" required minlength="6" />
+            <button type="button" class="password-toggle" tabindex="-1" title="Show/Hide Password">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+          </div>
+        </div>
+        <div class="auth-input-group">
+          <div class="input-wrapper">
+            <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <input type="password" id="signup-confirm" class="auth-input" placeholder="Confirm Password" autocomplete="new-password" required minlength="6" />
+            <button type="button" class="password-toggle" tabindex="-1" title="Show/Hide Password">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            </button>
+          </div>
+        </div>
+        <button type="submit" class="auth-btn" id="signup-btn">Sign Up</button>
+      </form>
     </div>
   </div>
-
-  
 </div>
+
 <div id="onboarding-view" class="hidden" style="transition: opacity 0.5s ease">
 <div class="ob-wrapper">
     <div class="ob-card">
 
-      <h1 class="ob-header">◈ Welcome to AuriOS ◈</h1>
+      <h1 class="ob-header">Welcome to AuriOS</h1>
       <p class="ob-subtitle">Your intelligent development assistant</p>
 
       <!-- Section 1: Name -->
@@ -114,7 +180,7 @@
         </div>
       </div>
 
-      <button id="start-btn" class="ob-start-btn">Get Started →</button>
+      <button id="start-btn" class="ob-start-btn">Get Started <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
 
     </div>
   </div>
@@ -126,7 +192,7 @@
 
   <!-- ── Backend offline banner ──────────────────────────────────────── -->
   <div id="backend-banner" class="backend-banner hidden">
-    ⚠️ Cannot connect to AuriOS backend. Retrying...
+    Cannot connect to AuriOS backend. Retrying...
   </div>
 
   <!-- ── Title bar ────────────────────────────────────────────────────── -->
@@ -139,14 +205,20 @@
     <div id="profile-pill" class="profile-pill">
       <span id="profile-avatar" class="profile-avatar">A</span>
       <span id="profile-name">Profile</span>
-      <span class="pill-caret">▾</span>
+      <span class="pill-caret"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></span>
     </div>
 
     <!-- Window controls -->
     <div id="window-controls">
-      <button class="wc-btn" id="btn-minimize" title="Minimize">─</button>
-      <button class="wc-btn" id="btn-maximize" title="Maximize">□</button>
-      <button class="wc-btn wc-close" id="btn-close" title="Close to tray">✕</button>
+      <button class="wc-btn" id="btn-minimize" aria-label="Minimize" title="Minimize">
+        <svg width="10" height="2" viewBox="0 0 10 2" fill="currentColor" aria-hidden="true"><rect width="10" height="2" rx="1"/></svg>
+      </button>
+      <button class="wc-btn" id="btn-maximize" aria-label="Maximize" title="Maximize">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x=".75" y=".75" width="8.5" height="8.5" rx="1"/></svg>
+      </button>
+      <button class="wc-btn wc-close" id="btn-close" aria-label="Close" title="Close to tray">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/></svg>
+      </button>
     </div>
   </div>
 
@@ -154,17 +226,35 @@
   <div id="profile-dropdown" class="dropdown hidden">
     <div class="dropdown-item dropdown-username" id="dd-username">Loading…</div>
     <div class="dropdown-separator"></div>
-    <div class="dropdown-item" data-action="my-profile">👤 My Profile</div>
-    <div class="dropdown-item" data-action="install-history">📋 Installation History</div>
-    <div class="dropdown-item" data-action="preferences">⚙️ Preferences</div>
+    <div class="dropdown-item" data-action="my-profile">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink:0"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      My Profile
+    </div>
+    <div class="dropdown-item" data-action="install-history">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink:0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Installation History
+    </div>
+    <div class="dropdown-item" data-action="preferences">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink:0"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      Preferences
+    </div>
     <div class="dropdown-separator"></div>
-    <div class="dropdown-item dropdown-danger" data-action="reset">🔄 Reset Profile</div>
+    <div class="dropdown-item dropdown-danger" data-action="logout">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink:0"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Logout
+    </div>
+    <div class="dropdown-item dropdown-danger" data-action="reset">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink:0"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+      Reset Profile
+    </div>
   </div>
 
   <!-- Modal overlay -->
   <div id="modal-overlay" class="modal-overlay hidden">
     <div id="modal-container" class="modal-container">
-      <button class="modal-close" id="modal-close-btn" title="Close">✕</button>
+      <button class="modal-close" id="modal-close-btn" title="Close">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="1" y1="1" x2="13" y2="13"/><line x1="13" y1="1" x2="1" y2="13"/></svg>
+      </button>
       <div id="modal-content"></div>
     </div>
   </div>
@@ -182,12 +272,19 @@
             <span id="agent-status">Ready</span>
           </div>
         </div>
-        <button id="new-chat-btn" class="new-chat-btn" title="Start a new chat">
+        <button id="new-chat-btn" class="new-chat-btn" aria-label="Start a new chat" title="Start a new chat">
           <span class="new-chat-plus">+</span>
           <span class="new-chat-label">New Chat</span>
         </button>
-        <button id="browse-software-btn" class="browse-software-btn" title="Browse available software">
-          <span class="browse-software-icon">📦</span>
+        <button id="browse-software-btn" class="browse-software-btn" aria-label="Browse available software" title="Browse available software">
+          <span class="browse-software-icon">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+            </svg>
+          </span>
           <span class="browse-software-label">Browse Software</span>
         </button>
       </div>
@@ -195,7 +292,7 @@
       <div class="sidebar-section-label">Conversations</div>
       <div id="chat-history-list" class="chat-history-list"></div>
 
-      <button id="sidebar-toggle" class="sidebar-toggle" title="Collapse sidebar">◀</button>
+      <button id="sidebar-toggle" class="sidebar-toggle" aria-label="Toggle sidebar" title="Collapse sidebar"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg></button>
     </div>
 
     <!-- ── Main content ──────────────────────────────────────────────── -->
@@ -207,49 +304,61 @@
           <div class="dashboard-inner">
 
             <div class="dashboard-greeting">
-              <h1 class="greeting-text">Good morning, <span id="dash-username">there</span> 👋</h1>
+              <h1 class="greeting-text">Good morning, <span id="dash-username">there</span></h1>
               <p class="greeting-sub">What would you like to set up today?</p>
             </div>
 
             <!-- Template cards grid -->
             <div class="template-grid" id="template-grid">
               <div class="template-card" data-prompt="Set up Python development environment">
-                <div class="template-icon">🐍</div>
+                <div class="template-icon">
+                  <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 11.5c0-1.1.9-2 2-2h4c1.1 0 2-.9 2-2V6a2 2 0 0 0-2-2h-4"/><path d="M16 12.5c0 1.1-.9 2-2 2H10c-1.1 0-2 .9-2 2V18a2 2 0 0 0 2 2h4"/><circle cx="9.5" cy="6.5" r=".75" fill="currentColor" stroke="none"/><circle cx="14.5" cy="17.5" r=".75" fill="currentColor" stroke="none"/></svg>
+                </div>
                 <div class="template-body">
                   <div class="template-title">Python Dev</div>
                   <div class="template-desc">Install Python, pip, and dev tools</div>
                 </div>
               </div>
               <div class="template-card" data-prompt="Install machine learning tools like TensorFlow and PyTorch">
-                <div class="template-icon">🤖</div>
+                <div class="template-icon">
+                  <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h2v5H7zM11 10h2v3h-2zM15 7h2v6h-2z"/></svg>
+                </div>
                 <div class="template-body">
                   <div class="template-title">Machine Learning</div>
                   <div class="template-desc">TensorFlow, PyTorch, scikit-learn</div>
                 </div>
               </div>
               <div class="template-card" data-prompt="Create a new React project with Node.js">
-                <div class="template-icon">⚛️</div>
+                <div class="template-icon">
+                  <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke-dasharray="4 2"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/></svg>
+                </div>
                 <div class="template-body">
                   <div class="template-title">React Project</div>
                   <div class="template-desc">Node.js, npm, Create React App</div>
                 </div>
               </div>
               <div class="template-card" data-prompt="Configure a PostgreSQL database on my system">
-                <div class="template-icon">🗄️</div>
+                <div class="template-icon">
+                  <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
+                </div>
                 <div class="template-body">
                   <div class="template-title">Database Setup</div>
                   <div class="template-desc">PostgreSQL, MySQL, or SQLite</div>
                 </div>
               </div>
               <div class="template-card" data-prompt="Install Node.js and npm package manager">
-                <div class="template-icon">📦</div>
+                <div class="template-icon">
+                  <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                </div>
                 <div class="template-body">
                   <div class="template-title">Node.js &amp; npm</div>
                   <div class="template-desc">Latest LTS, npm, yarn</div>
                 </div>
               </div>
               <div class="template-card" data-prompt="Set up Git and configure my GitHub account">
-                <div class="template-icon">🔧</div>
+                <div class="template-icon">
+                  <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M6 9v6M9 6h6a3 3 0 0 1 3 3v6"/></svg>
+                </div>
                 <div class="template-body">
                   <div class="template-title">Git &amp; GitHub</div>
                   <div class="template-desc">Git, SSH keys, GitHub CLI</div>
@@ -258,7 +367,7 @@
             </div>
 
             <!-- Recent history -->
-            <div class="recent-section" id="recent-section">
+            <div class="recent-section" id="recent-section" style="display:none">
               <div class="recent-header">Recent</div>
               <div class="recent-list" id="recent-list"></div>
             </div>
@@ -268,30 +377,38 @@
 
         <!-- ── Chat messages ───────────────────────────────────────────── -->
         <div id="chat-messages" class="hidden" role="log" aria-live="polite">
+          <div id="chat-messages-header" style="display:flex;justify-content:flex-end;padding:4px 12px 0;flex-shrink:0;">
+            <button id="clear-chat-btn" aria-label="Clear chat history" title="Clear chat history" style="background:none;border:1px solid rgba(255,255,255,0.12);color:var(--text-secondary,#94a3b8);font-size:11px;padding:3px 9px;border-radius:4px;cursor:pointer;opacity:0.7;display:flex;align-items:center;gap:5px;">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Clear
+            </button>
+          </div>
           <div id="messages-inner"></div>
         </div>
 
         <!-- Typing indicator -->
         <div id="typing-indicator" class="typing-indicator hidden">
-          <span>Auri is thinking… ⚙️</span>
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink:0;opacity:0.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <span>Auri is thinking…</span>
           <span class="dot-bounce">.</span>
           <span class="dot-bounce" style="animation-delay:.2s">.</span>
           <span class="dot-bounce" style="animation-delay:.4s">.</span>
         </div>
 
-        <!-- Suggestions dropdown -->
-        <div id="suggestions-dropdown" class="suggestions-dropdown hidden"></div>
-
         <!-- Input bar -->
         <div id="input-bar">
           <div id="input-bar-inner">
-            <button id="mic-btn" class="icon-btn" title="Voice input">🎙️</button>
+            <!-- Suggestions dropdown -->
+            <div id="suggestions-dropdown" class="suggestions-dropdown hidden"></div>
+            
             <textarea id="chat-input"
                       rows="1"
-                      placeholder="Message Auri…"
+                      placeholder="Message Auri... (v2)"
                       autocomplete="off"
                       aria-label="Chat input"></textarea>
-            <button id="send-btn" class="icon-btn send-btn disabled" title="Send">➤</button>
+            <button id="send-btn" class="icon-btn send-btn disabled" aria-label="Send message" title="Send">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
           </div>
         </div>
 
@@ -302,23 +419,574 @@
 
   <!-- ── Status bar ────────────────────────────────────────────────────── -->
   <div id="statusbar">
-    <span class="status-item" id="status-ollama">● Ollama: Checking...</span>
-    <span class="status-item" id="status-admin" title="Click to request admin privileges">● Admin: Checking...</span>
-    <span class="status-item" id="status-disk">● Disk: ...</span>
-    <span class="status-item" id="status-python">● Python: ...</span>
+    <span class="status-item" id="status-ollama">● Ollama: <span class="dot-bounce">.</span><span class="dot-bounce" style="animation-delay:.2s">.</span><span class="dot-bounce" style="animation-delay:.4s">.</span></span>
+    <span class="status-item" id="status-admin" title="Click to request admin privileges">● Admin: <span class="dot-bounce">.</span><span class="dot-bounce" style="animation-delay:.2s">.</span><span class="dot-bounce" style="animation-delay:.4s">.</span></span>
+    <span class="status-item" id="status-disk">● Disk: <span class="dot-bounce">.</span><span class="dot-bounce" style="animation-delay:.2s">.</span><span class="dot-bounce" style="animation-delay:.4s">.</span></span>
+    <span class="status-item" id="status-python">● Python: <span class="dot-bounce">.</span><span class="dot-bounce" style="animation-delay:.2s">.</span><span class="dot-bounce" style="animation-delay:.4s">.</span></span>
     <div id="statusbar-version">v1.1.0</div>
   </div>
 
   <!-- ── Scripts ───────────────────────────────────────────────────────── -->
   
 </div>
+<!-- ── Admin Dashboard View ──────────────────────────────────────────────── -->
+<div id="admin-view" class="hidden">
+
+  <!-- Titlebar -->
+  <div id="admin-titlebar">
+    <div class="admin-titlebar-drag">
+      <span class="admin-titlebar-title">AuriOS</span>
+      <span class="admin-titlebar-badge">Admin</span>
+    </div>
+    <div id="admin-window-controls">
+      <button class="wc-btn" id="admin-btn-minimize" title="Minimize">
+        <svg width="10" height="2" viewBox="0 0 10 2" fill="currentColor" aria-hidden="true"><rect width="10" height="2" rx="1"/></svg>
+      </button>
+      <button class="wc-btn" id="admin-btn-maximize" title="Maximize">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x=".75" y=".75" width="8.5" height="8.5" rx="1"/></svg>
+      </button>
+      <button class="wc-btn wc-close" id="admin-btn-close" title="Close">
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><line x1="1" y1="1" x2="9" y2="9"/><line x1="9" y1="1" x2="1" y2="9"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Body: sidebar + main -->
+  <div id="admin-body">
+
+    <!-- Sidebar -->
+    <nav id="admin-sidebar">
+      <div class="admin-sidebar-brand">
+        <div class="admin-brand-mark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12l10-10 10 10-10 10L2 12z"/></svg></div>
+        <div>
+          <div class="admin-brand-name">Admin Console</div>
+          <div class="admin-brand-sub">AuriOS v1.1</div>
+        </div>
+      </div>
+
+      <div class="admin-nav-group">
+        <div class="admin-nav-group-label">Main Menu</div>
+        <a class="admin-nav-item active" data-section="overview">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+          <span>Overview</span>
+        </a>
+        <a class="admin-nav-item" data-section="system-status">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+          <span>System Status</span>
+        </a>
+        <a class="admin-nav-item" data-section="users">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          <span>Users</span>
+        </a>
+        <a class="admin-nav-item" data-section="admin-management">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <span>Admin Management</span>
+        </a>
+        <a class="admin-nav-item" data-section="conversations">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          <span>Conversations</span>
+        </a>
+        <a class="admin-nav-item" data-section="sessions">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          <span>Sessions</span>
+        </a>
+        <a class="admin-nav-item" data-section="preferences">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span>Preferences</span>
+        </a>
+        <a class="admin-nav-item" data-section="software-manager">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+          <span>Software Manager</span>
+        </a>
+        <a class="admin-nav-item" data-section="software">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+          <span>Software Catalog</span>
+        </a>
+      </div>
+
+      <div class="admin-sidebar-footer">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar">A</div>
+          <div class="admin-user-info">
+            <div class="admin-user-name">Admin</div>
+            <div class="admin-user-role">System Administrator</div>
+            <button id="admin-logout-btn" class="admin-logout-btn">Logout</button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main -->
+    <div id="admin-main">
+
+      <!-- Topbar -->
+      <div id="admin-topbar">
+        <h1 id="admin-page-title">Overview</h1>
+        <div class="admin-topbar-actions">
+          <button id="admin-refresh-btn" class="admin-action-btn">
+            <span class="refresh-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg></span> <span class="refresh-text">Refresh</span>
+          </button>
+          <div class="admin-live-time" id="admin-live-time"></div>
+        </div>
+      </div>
+
+      <!-- Scrollable content -->
+      <div id="admin-content">
+
+        <!-- ── Overview ───────────────────────────────────────────────────── -->
+        <div id="section-overview" class="admin-section">
+          <div class="admin-stat-grid">
+            <div class="admin-stat-card card-cyan">
+              <div class="asc-label">Total Users</div>
+              <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                <div>
+                  <div class="asc-value" id="stat-users">—</div>
+                  <div class="asc-trend trend-cyan" id="trend-users"></div>
+                </div>
+                <div id="spark-users" class="asc-sparkline"></div>
+              </div>
+            </div>
+            
+            <div class="admin-stat-card card-purple">
+              <div class="asc-label">Active Sessions</div>
+              <div style="display:flex; justify-content:space-between; align-items:flex-end; height:100%;">
+                <div>
+                  <div class="asc-value" id="stat-sessions">—</div>
+                  <div class="asc-trend trend-purple" id="trend-sessions">
+                    <span class="live-dot" id="live-session-dot"></span><span id="live-session-text"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="admin-stat-card card-amber">
+              <div class="asc-label">Installations</div>
+              <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                <div>
+                  <div class="asc-value" id="stat-installs">—</div>
+                  <div class="asc-trend trend-amber" id="trend-installs"></div>
+                </div>
+                <div id="spark-installs" class="asc-sparkline"></div>
+              </div>
+            </div>
+            
+            <div class="admin-stat-card card-green">
+              <div class="asc-label">Conversations</div>
+              <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                <div>
+                  <div class="asc-value" id="stat-convos">—</div>
+                  <div class="asc-trend trend-green" id="trend-convos"></div>
+                </div>
+                <div id="spark-convos" class="asc-sparkline"></div>
+              </div>
+            </div>
+          </div>
+
+
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px;">
+            <div class="admin-table-section" style="margin-bottom: 0;">
+              <div class="admin-table-header"><h3>Installation Activity (30 Days)</h3></div>
+              <div id="chart-install-activity" style="height: 120px; padding: 0 16px 16px;"></div>
+            </div>
+            <div class="admin-table-section" style="margin-bottom: 0;">
+              <div class="admin-table-header"><h3>Top Installed Software</h3></div>
+              <div id="chart-top-software" style="padding: 0 16px 16px; display:flex; flex-direction:column; gap:8px; height: 120px; overflow: hidden;"></div>
+            </div>
+          </div>
+          <div class="admin-table-section" style="margin-bottom:16px;">
+            <div class="admin-table-header"><h3>Installation Success / Failure (30 Days)</h3></div>
+            <div id="chart-success-fail" style="height:80px;padding:0 16px 16px;"></div>
+          </div>
+
+          <div class="admin-table-section">
+            <div class="admin-table-header">
+              <h3>Recent Installations</h3>
+              <span id="overview-installs-count" class="admin-count-badge">0</span>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>Preset / Software</th>
+                    <th>Status</th>
+                    <th>Duration</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody id="overview-installs-body">
+                  <tr class="admin-empty-row"><td colspan="4">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Users ─────────────────────────────────────────────────────── -->
+        <div id="section-users" class="admin-section hidden">
+
+          <div class="admin-table-section">
+            <div class="admin-table-header"><h3>User Growth (14 Days)</h3></div>
+            <div id="chart-user-growth" style="height: 100px; padding: 0 16px 16px;"></div>
+          </div>
+          <div class="admin-table-section">
+            <div class="admin-table-header">
+              <h3>Registered Users</h3>
+              <span id="users-count" class="admin-count-badge">0</span>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="users-body">
+                  <tr class="admin-empty-row"><td colspan="6">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Installations ─────────────────────────────────────────────── -->
+        <div id="section-installations" class="admin-section hidden">
+
+          <div class="admin-table-section">
+            <div class="admin-table-header">
+              <h3>Running Tasks</h3>
+              <span id="tasks-count" class="admin-count-badge">0</span>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr><th>Task ID</th><th>Preset</th><th>Status</th><th>Progress</th><th>Step</th><th>Action</th></tr>
+                </thead>
+                <tbody id="tasks-body">
+                  <tr class="admin-empty-row"><td colspan="6">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="admin-table-section">
+            <div class="admin-table-header">
+              <h3>Installation History</h3>
+              <span id="installs-count" class="admin-count-badge">0</span>
+            </div>
+            <div style="padding:8px 16px;display:flex;gap:8px;align-items:center;border-bottom:1px solid rgba(255,255,255,0.06);">
+              <input id="installs-filter-text" type="text" class="pref-inline-input" placeholder="Search preset or software…" style="flex:1;max-width:280px;font-size:12px;"/>
+              <select id="installs-filter-status" class="pref-inline-input" style="width:140px;font-size:12px;">
+                <option value="">All Statuses</option>
+                <option value="success">Success</option>
+                <option value="failed">Failed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <button id="installs-filter-clear" class="admin-action-btn" style="font-size:11px;padding:4px 10px;">Clear</button>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr><th>ID</th><th>Preset / Software</th><th>Status</th><th>Duration</th><th>Timestamp</th></tr>
+                </thead>
+                <tbody id="installs-body">
+                  <tr class="admin-empty-row"><td colspan="5">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ── Conversations ─────────────────────────────────────────────── -->
+        <div id="section-conversations" class="admin-section hidden">
+          <div class="admin-section-topbar">
+            <button id="clear-history-btn" class="admin-action-btn"
+              style="border-color:rgba(239,68,68,0.3);color:#ef4444;">
+              Clear History
+            </button>
+          </div>
+          <div class="admin-table-section">
+            <div class="admin-table-header">
+              <h3>Conversation Log</h3>
+              <span id="convos-count" class="admin-count-badge">0</span>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr><th>ID</th><th>Role</th><th>Message Preview</th><th>Timestamp</th></tr>
+                </thead>
+                <tbody id="convos-body">
+                  <tr class="admin-empty-row"><td colspan="4">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── System Status ─────────────────────────────────────────────── -->
+        <div id="section-system-status" class="admin-section hidden">
+          <div id="system-status-content">
+            <div class="admin-loading-state">Loading system status…</div>
+          </div>
+        </div>
+
+        <!-- ── Sessions ──────────────────────────────────────────────────── -->
+        <div id="section-sessions" class="admin-section hidden">
+          <div class="admin-table-section">
+            <div class="admin-table-header">
+              <h3>Active Sessions</h3>
+              <span id="sessions-count" class="admin-count-badge">0</span>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr><th>Token</th><th>User</th><th>Email</th><th>Created</th><th>Action</th></tr>
+                </thead>
+                <tbody id="sessions-body">
+                  <tr class="admin-empty-row"><td colspan="5">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Preferences ───────────────────────────────────────────────── -->
+        <div id="section-preferences" class="admin-section hidden">
+          <div class="admin-section-topbar">
+            <button id="reset-prefs-btn" class="admin-action-btn" style="border-color:rgba(239,68,68,0.3);color:#ef4444;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg> Reset All
+            </button>
+          </div>
+          <div class="admin-table-section">
+            <div class="admin-table-header">
+              <h3>User Preferences</h3>
+              <span id="prefs-count" class="admin-count-badge">0</span>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr><th>Key</th><th>Value</th><th>Last Updated</th><th>Action</th></tr>
+                </thead>
+                <tbody id="prefs-body">
+                  <tr class="admin-empty-row"><td colspan="4">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Conversations (with clear button) ─────────────────────────── -->
+        <!-- section-conversations already defined above; we patch it via JS -->
+
+        <!-- ── Software Catalog ──────────────────────────────────────────── -->
+        <div id="section-software" class="admin-section hidden">
+          <div class="admin-section-topbar" style="justify-content: space-between;">
+            <button id="catalog-refresh-btn" class="admin-action-btn">
+              <span class="refresh-icon"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg></span> <span class="refresh-text">Refresh from Source</span>
+            </button>
+            <button id="add-software-btn" class="admin-action-btn" style="color: #a78bfa; border-color: #8b5cf6;">
+              + Add Software
+            </button>
+          </div>
+          <div class="admin-table-section">
+            <div class="admin-table-header">
+              <h3>Available Software</h3>
+              <span id="catalog-count" class="admin-count-badge">0</span>
+              <span id="catalog-sync-status" style="margin-left:auto;font-size:11px;color:var(--text-muted);padding-right:8px;"></span>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr><th>Display Name</th><th>Slug</th><th>Source</th><th>Filename</th><th style="text-align: right;">Actions</th></tr>
+                </thead>
+                <tbody id="catalog-body">
+                  <tr class="admin-empty-row"><td colspan="4">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Admin Management ────────────────────────────────────────────── -->
+        <div id="section-admin-management" class="admin-section hidden">
+          <div class="admin-section-topbar" style="justify-content: space-between;">
+            <button id="add-admin-btn" class="admin-action-btn" style="color:#a78bfa;border-color:#8b5cf6;">+ Create Admin</button>
+          </div>
+          <div class="admin-table-section">
+            <div class="admin-table-header">
+              <h3>System Administrators</h3>
+              <span id="admins-count" class="admin-count-badge">0</span>
+            </div>
+            <div class="admin-table-wrapper">
+              <table class="admin-table">
+                <thead>
+                  <tr><th>ID</th><th>Name</th><th>Email</th><th>Created</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="admins-body">
+                  <tr class="admin-empty-row"><td colspan="5">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Software Manager ───────────────────────────────────────────── -->
+        <div id="section-software-manager" class="admin-section hidden">
+          <div class="admin-section-topbar" style="justify-content: space-between;">
+            <div style="display:flex;gap:8px;">
+              <button id="tab-download-btn" class="admin-action-btn active"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-1px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download</button>
+              <button id="tab-upload-btn" class="admin-action-btn">Upload</button>
+            </div>
+            <button id="github-settings-btn" class="admin-action-btn" style="color:#f59e0b;border-color:#f59e0b;">GitHub Settings</button>
+          </div>
+
+          <!-- Download Tab -->
+          <div id="sw-tab-download" class="admin-table-section">
+            <div class="admin-table-header"><h3>Download Software</h3></div>
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:16px;">
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input id="dl-search-input" type="text" class="pref-inline-input" placeholder="Software name (e.g. python, git, vscode)…" style="flex:1;"/>
+                <button id="dl-start-btn" class="admin-action-btn" style="background:#06b6d4;color:#000;border-color:#06b6d4;">Search &amp; Download</button>
+              </div>
+              <div id="dl-progress-wrap" style="display:none;">
+                <div class="sys-disk-bar-wrap">
+                  <div class="sys-disk-bar"><div id="dl-progress-bar" class="sys-disk-fill" style="width:0%"></div></div>
+                  <span id="dl-pct-text" class="sys-disk-label">0%</span>
+                </div>
+                <div id="dl-status-text" style="font-size:12px;color:var(--text-muted);margin-top:6px;"></div>
+              </div>
+              <button id="dl-to-upload-btn" class="admin-action-btn" style="display:none;color:#a78bfa;border-color:#8b5cf6;">Move to Upload Tab <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></button>
+            </div>
+          </div>
+
+          <!-- Upload Tab -->
+          <div id="sw-tab-upload" class="admin-table-section hidden">
+            <div class="admin-table-header"><h3>Upload to GitHub Release</h3></div>
+            <div style="padding:16px 20px;display:flex;flex-direction:column;gap:16px;">
+              <input id="up-filepath-input" type="text" class="pref-inline-input" placeholder="Full path to installer file…"/>
+              <div style="display:flex;gap:8px;">
+                <input id="up-tag-input" type="text" class="pref-inline-input" placeholder="Release tag (e.g. v1.2)" style="width:160px;"/>
+                <input id="up-displayname-input" type="text" class="pref-inline-input" placeholder="Display name" style="flex:1;"/>
+                <button id="up-start-btn" class="admin-action-btn" style="background:#8b5cf6;color:#fff;border-color:#8b5cf6;">Upload</button>
+              </div>
+              <div id="up-progress-wrap" style="display:none;">
+                <div class="sys-disk-bar-wrap">
+                  <div class="sys-disk-bar"><div id="up-progress-bar" class="sys-disk-fill" style="width:0%;background:#8b5cf6"></div></div>
+                  <span id="up-pct-text" class="sys-disk-label">0%</span>
+                </div>
+                <div id="up-status-text" style="font-size:12px;color:var(--text-muted);margin-top:6px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Installations (tasks sub-table) ───────────────────────────── -->
+        <!-- section-installations is defined above; tasks table injected inside -->
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Statusbar -->
+  <div id="admin-statusbar">
+    <span class="admin-status-item" id="admin-status-backend">● Backend: Connected</span>
+    <div class="admin-statusbar-version">AuriOS v1.1.0 — Admin Console</div>
+  </div>
+
+</div>
+
+<!-- ── Admin: Toast container ───────────────────────────────────────────── -->
+<div id="admin-toast-container"></div>
+
+<!-- ── Admin: Confirm dialog ────────────────────────────────────────────── -->
+<div id="admin-confirm-overlay" class="hidden">
+  <div class="admin-confirm-box">
+    <div class="admin-confirm-title">Confirm Action</div>
+    <div id="admin-confirm-msg"></div>
+    <div class="admin-confirm-actions">
+      <button id="admin-confirm-no"  class="confirm-btn-no">Cancel</button>
+      <button id="admin-confirm-yes" class="confirm-btn-yes">Confirm</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── Admin: Reset Password Modal ──────────────────────────────────────── -->
+<div id="admin-reset-pw-modal" class="hidden" style="position:fixed; inset:0; background:rgba(14,14,18,0.85); z-index:8500; display:flex; align-items:center; justify-content:center;">
+  <div style="background:#1a1a24; border:1px solid #8b5cf6; border-radius:6px; padding:24px; width:400px;">
+    <h3 style="margin:0 0 16px; color:#fff; font-size:15px; font-weight:600;">Reset Password</h3>
+    <p id="reset-pw-target" style="color:#a1a1aa; font-size:13px; margin-bottom:16px;"></p>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <input type="password" id="reset-pw-new" placeholder="New Password" class="pref-inline-input"/>
+      <input type="password" id="reset-pw-confirm" placeholder="Confirm Password" class="pref-inline-input"/>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+      <button id="reset-pw-cancel" class="admin-action-btn" style="border-color:transparent;">Cancel</button>
+      <button id="reset-pw-save" class="admin-action-btn" style="background:#ef4444; color:#fff; border-color:#ef4444;">Force Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Admin: Create Admin Modal ────────────────────────────────────────── -->
+<div id="admin-create-modal" class="hidden" style="position:fixed; inset:0; background:rgba(14,14,18,0.85); z-index:8500; display:flex; align-items:center; justify-content:center;">
+  <div style="background:#1a1a24; border:1px solid #8b5cf6; border-radius:6px; padding:24px; width:400px;">
+    <h3 style="margin:0 0 16px; color:#fff; font-size:15px; font-weight:600;">Create Administrator</h3>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <input type="text" id="new-admin-name" placeholder="Full Name" class="pref-inline-input"/>
+      <input type="text" id="new-admin-email" placeholder="Email Address" class="pref-inline-input"/>
+      <input type="password" id="new-admin-pw" placeholder="Password" class="pref-inline-input"/>
+      <input type="password" id="new-admin-pw-confirm" placeholder="Confirm Password" class="pref-inline-input"/>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+      <button id="create-admin-cancel" class="admin-action-btn" style="border-color:transparent;">Cancel</button>
+      <button id="create-admin-save" class="admin-action-btn" style="background:#8b5cf6; color:#fff; border-color:#8b5cf6;">Create Admin</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Admin: GitHub Settings Modal ─────────────────────────────────────── -->
+<div id="admin-github-modal" class="hidden" style="position:fixed; inset:0; background:rgba(14,14,18,0.85); z-index:8500; display:flex; align-items:center; justify-content:center;">
+  <div style="background:#1a1a24; border:1px solid #8b5cf6; border-radius:6px; padding:24px; width:400px;">
+    <h3 style="margin:0 0 16px; color:#fff; font-size:15px; font-weight:600;">GitHub Repository Settings</h3>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <input type="password" id="gh-token" placeholder="GitHub PAT Token (ghp_...)" class="pref-inline-input"/>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button id="gh-validate-btn" class="admin-action-btn" style="white-space:nowrap;">Validate Token</button>
+        <span id="gh-validate-status" style="font-size:12px;"></span>
+      </div>
+      <input type="text" id="gh-owner" placeholder="Repository Owner (e.g. MAR9775)" class="pref-inline-input"/>
+      <input type="text" id="gh-repo" placeholder="Repository Name (e.g. AuriOS-Software-Repository)" class="pref-inline-input"/>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+      <button id="gh-modal-cancel" class="admin-action-btn" style="border-color:transparent;">Cancel</button>
+      <button id="gh-modal-save" class="admin-action-btn" style="background:#8b5cf6; color:#fff; border-color:#8b5cf6;">Save securely</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Admin: Software Modal ────────────────────────────────────────────── -->
+<div id="admin-software-modal" class="hidden" style="position:fixed; inset:0; background:rgba(14,14,18,0.85); z-index:8500; display:flex; align-items:center; justify-content:center;">
+  <div style="background:#1a1a24; border:1px solid #8b5cf6; border-radius:6px; padding:24px; width:400px;">
+    <h3 id="software-modal-title" style="margin:0 0 16px; color:#fff; font-size:15px; font-weight:600;">Add Software</h3>
+    <div style="display:flex; flex-direction:column; gap:12px;">
+      <input type="text" id="sw-display-name" placeholder="Display Name (e.g. Visual Studio Code)" class="pref-inline-input" style="font-family:inherit;"/>
+      <input type="text" id="sw-slug" placeholder="Slug (e.g. vscode)" class="pref-inline-input"/>
+      <input type="text" id="sw-url" placeholder="Source URL" class="pref-inline-input"/>
+      <input type="text" id="sw-filename" placeholder="Filename (e.g. VSCodeSetup.exe)" class="pref-inline-input"/>
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:20px;">
+      <button id="sw-modal-cancel" class="admin-action-btn" style="border-color:transparent;">Cancel</button>
+      <button id="sw-modal-save" class="admin-action-btn" style="background:#8b5cf6; color:#fff; border-color:#8b5cf6;">Save</button>
+    </div>
+  </div>
+</div>
+
 <script src="scripts/web-api.js"></script>
   <script src="scripts/agent-animation.js"></script>
   <script src="scripts/profile.js"></script>
   <script src="scripts/progress-panel.js"></script>
-  <script src="scripts/speech.js"></script>
   <script src="scripts/tts.js"></script>
-  <script src="scripts/app.js"></script>
+  <script src="scripts/auth.js"></script>
+  <script src="scripts/app.js?v=2"></script>
+  <script src="scripts/admin.js"></script>
 
   <script src="scripts/onboarding.js"></script>
   <script src="scripts/splash.js"></script>

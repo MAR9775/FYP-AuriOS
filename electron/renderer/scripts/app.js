@@ -16,6 +16,11 @@ let lastAuriReply    = '';
 let currentView      = 'dashboard';   // 'dashboard' | 'chat'
 let suggestionIndex  = -1;
 
+// ── Response state ────────────────────────────────────────────────────────────
+let isGenerating     = false;   // true while awaiting a backend response
+let activeAbort      = null;    // AbortController for the current request
+let pendingMessage   = null;    // message queued while a response is in-flight
+
 // ── Suggestions list ──────────────────────────────────────────────────────────
 const SUGGESTIONS = [
   'Set up Python development environment',
@@ -81,9 +86,136 @@ const conversationManager = {
     this.save(convs);
     if (this.getActiveId() === id) localStorage.removeItem(ACTIVE_KEY);
   },
+  renameConv(id, title) {
+    const convs = this.load();
+    const conv = convs.find(c => c.id === id);
+    if (conv) {
+      conv.title = title;
+      this.save(convs);
+    }
+  },
+  cleanup() {
+    let convs = this.load();
+    convs = convs.filter(c => c.messages.length > 0);
+    const unique = [];
+    const seen = new Set();
+    for (const c of convs) {
+      if (!seen.has(c.id)) {
+        unique.push(c);
+        seen.add(c.id);
+      }
+    }
+    this.save(unique);
+    if (this.getActiveId() && !unique.find(c => c.id === this.getActiveId())) {
+      this.setActiveId(null);
+    }
+  }
 };
 
 // ── Sidebar rendering ─────────────────────────────────────────────────────────
+let currentContextMenu = null;
+
+function closeContextMenu() {
+  if (currentContextMenu) {
+    currentContextMenu.remove();
+    currentContextMenu = null;
+  }
+}
+
+document.addEventListener('click', closeContextMenu);
+
+function openContextMenu(triggerEl, convId, itemEl, titleEl) {
+  closeContextMenu();
+  
+  const menu = document.createElement('div');
+  menu.className = 'history-context-menu';
+  menu.innerHTML = `
+    <div class="history-context-item" data-action="rename">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+      Rename
+    </div>
+    <div class="history-context-item danger" data-action="delete">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      Delete
+    </div>
+  `;
+  
+  document.body.appendChild(menu);
+  
+  // Position relative to the button, not the SVG child inside it
+  const rect = triggerEl.getBoundingClientRect();
+  const menuW = 160;
+  const left = Math.min(rect.right - menuW, window.innerWidth - menuW - 8);
+  menu.style.top  = rect.bottom + 4 + 'px';
+  menu.style.left = Math.max(8, left) + 'px';
+  
+  menu.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    // Use .closest() so clicks on inner SVG elements still resolve the action
+    const actionEl = ev.target.closest('[data-action]');
+    const action = actionEl?.dataset.action;
+    if (!action) return;
+    closeContextMenu();
+    
+    if (action === 'delete') {
+      showCustomConfirm('Delete this chat? This cannot be undone.', () => {
+        const wasActive = conversationManager.getActiveId() === convId;
+        conversationManager.deleteConv(convId);
+        if (wasActive || conversationManager.getActiveId() === null) {
+          startNewChat();
+        } else {
+          renderSidebar();
+        }
+      }, 'Delete');
+    } else if (action === 'rename') {
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'history-title-input';
+      input.value = titleEl.textContent;
+      
+      const saveTitle = () => {
+        const val = input.value.trim();
+        if (val) {
+          conversationManager.renameConv(convId, val);
+        }
+        renderSidebar();
+      };
+      
+      input.addEventListener('blur', saveTitle);
+      input.addEventListener('keydown', (keyEv) => {
+        if (keyEv.key === 'Enter') saveTitle();
+        if (keyEv.key === 'Escape') renderSidebar();
+      });
+      
+      titleEl.replaceWith(input);
+      input.focus();
+      input.select();
+    }
+  });
+  
+  currentContextMenu = menu;
+}
+
+function showCustomConfirm(msg, onConfirm, confirmLabel = 'Confirm') {
+  const overlay = document.createElement('div');
+  overlay.className = 'custom-confirm-overlay';
+  overlay.innerHTML = `
+    <div class="custom-confirm-box">
+      <div class="custom-confirm-msg">${escapeHtml(msg)}</div>
+      <div class="custom-confirm-actions">
+        <button class="confirm-btn-cancel">Cancel</button>
+        <button class="confirm-btn-yes danger">${escapeHtml(confirmLabel)}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('.confirm-btn-cancel').addEventListener('click', () => overlay.remove());
+  overlay.querySelector('.confirm-btn-yes').addEventListener('click', () => {
+    overlay.remove();
+    onConfirm();
+  });
+}
 function renderSidebar() {
   const list = document.getElementById('chat-history-list');
   if (!list) return;
@@ -103,10 +235,26 @@ function renderSidebar() {
     const item = document.createElement('div');
     item.className = 'chat-history-item' + (conv.id === activeId ? ' active' : '');
     item.innerHTML = `
-      <span class="history-icon">💬</span>
+      <span class="history-icon"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
       <span class="history-title">${escapeHtml(conv.title)}</span>
+      <button class="history-menu-btn" title="Options">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+      </button>
     `;
-    item.addEventListener('click', () => switchConversation(conv.id));
+    
+    const titleEl = item.querySelector('.history-title');
+    const menuBtn = item.querySelector('.history-menu-btn');
+    
+    item.addEventListener('click', (e) => {
+      if (e.target === menuBtn || e.target.tagName === 'INPUT') return;
+      switchConversation(conv.id);
+    });
+    
+    menuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openContextMenu(menuBtn, conv.id, item, titleEl);
+    });
+    
     list.appendChild(item);
   });
 }
@@ -138,6 +286,19 @@ function switchConversation(convId) {
 }
 
 function startNewChat() {
+  // If a response is in-flight, abort it first
+  if (isGenerating) stopGeneration();
+
+  // If already on an empty chat, just clear the view — don't pile up empty convs
+  const active = conversationManager.getActive();
+  if (active && active.messages.length === 0) {
+    if (messagesInner) messagesInner.innerHTML = '';
+    lastAuriReply = '';
+    showDashboard();
+    renderSidebar();
+    return;
+  }
+  // Create the conversation immediately so it appears in the sidebar at once
   conversationManager.create();
   if (messagesInner) messagesInner.innerHTML = '';
   lastAuriReply = '';
@@ -195,7 +356,7 @@ function addRecentItem(text) {
   if (existing) return;
   const item = document.createElement('div');
   item.className = 'recent-item';
-  item.innerHTML = `<span class="recent-item-icon">💬</span>
+  item.innerHTML = `<span class="recent-item-icon"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
     <span class="recent-text">${escapeHtml(text)}</span>`;
   item.addEventListener('click', () => {
     chatInput.value = text;
@@ -211,7 +372,7 @@ function addRecentItem(text) {
 // ── Textarea auto-resize ──────────────────────────────────────────────────────
 function autoResizeTextarea() {
   chatInput.style.height = 'auto';
-  chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px';
 }
 
 // ── Suggestions ───────────────────────────────────────────────────────────────
@@ -255,9 +416,26 @@ function navigateSuggestions(dir) {
 
 // ── Send-button state ─────────────────────────────────────────────────────────
 function updateSendBtnState() {
-  const empty = chatInput.value.trim().length === 0;
-  sendBtn.disabled = empty;
-  sendBtn.classList.toggle('disabled', empty);
+  if (isGenerating) {
+    // Disable send button while waiting for response — no queuing, no stop
+    sendBtn.disabled  = true;
+    sendBtn.classList.add('disabled');
+    sendBtn.classList.remove('stop-mode');
+    sendBtn.title     = 'Waiting for response…';
+    sendBtn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+    sendBtn.setAttribute('aria-label', 'Send message');
+    chatInput.placeholder = 'Auri is thinking…';
+  } else {
+    // Show send button, enabled only when there is text
+    const empty = chatInput.value.trim().length === 0;
+    sendBtn.disabled  = empty;
+    sendBtn.classList.toggle('disabled', empty);
+    sendBtn.classList.remove('stop-mode');
+    sendBtn.title     = 'Send';
+    sendBtn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
+    sendBtn.setAttribute('aria-label', 'Send message');
+    chatInput.placeholder = 'Message Auri...';
+  }
 }
 
 chatInput.addEventListener('input', () => {
@@ -284,7 +462,7 @@ chatInput.addEventListener('keydown', (e) => {
     }
     if (e.key === 'Escape') { hideSuggestions(); return; }
   }
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!isGenerating) sendMessage(); }
 });
 
 chatInput.addEventListener('blur', () => { setTimeout(hideSuggestions, 150); });
@@ -314,8 +492,49 @@ async function retryBackend() {
   } catch (_) {}
 }
 
+// ── stopGeneration ────────────────────────────────────────────────────────────
+function stopGeneration() {
+  if (!isGenerating) return;
+  // Abort the in-flight request
+  if (activeAbort) {
+    activeAbort.abort();
+    activeAbort = null;
+  }
+  isGenerating = false;
+  showTyping(false);
+  updateSendBtnState();
+
+  // Mark the last auri bubble as interrupted
+  const bubbles = messagesInner
+    ? messagesInner.querySelectorAll('.message.auri')
+    : chatMessages.querySelectorAll('.message.auri');
+  const last = bubbles[bubbles.length - 1];
+  if (last && !last.querySelector('.msg-interrupted')) {
+    const tag = document.createElement('span');
+    tag.className = 'msg-interrupted';
+    tag.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="vertical-align:-1px"><rect x="3" y="3" width="18" height="18" rx="2"/></svg> interrupted';
+    last.appendChild(tag);
+  }
+}
+
 // ── sendMessage ───────────────────────────────────────────────────────────────
 async function sendMessage() {
+  // If generating: stop current -> then send new message
+  if (isGenerating) {
+    const queued = chatInput.value.trim();
+    stopGeneration();
+    if (queued) {
+      // Small tick so the UI settles before the next request fires
+      setTimeout(() => {
+        chatInput.value = queued;
+        autoResizeTextarea();
+        updateSendBtnState();
+        sendMessage();
+      }, 80);
+    }
+    return;
+  }
+
   const text = chatInput.value.trim();
   if (!text) return;
 
@@ -338,10 +557,10 @@ async function sendMessage() {
     autoResizeTextarea();
     updateSendBtnState();
     if (lastAuriReply && window.tts && typeof window.tts.speak === 'function') {
-      renderMessage('assistant', 'Sure! Bol rahi hoon... 🔊');
+      renderMessage('assistant', 'Speaking the last response...');
       window.tts.speak(lastAuriReply);
     } else {
-      renderMessage('assistant', 'Abhi tak kuch nahi kaha maine! Pehle kuch poochho 😊');
+      renderMessage('assistant', "Nothing to speak yet — ask me something first.");
     }
     return;
   }
@@ -350,21 +569,10 @@ async function sendMessage() {
   const wasVoiceInput = !!window._lastInputWasVoice;
   window._lastInputWasVoice = false;
 
-  // Pre-flight admin / disk checks
-  const INSTALL_RE = /\b(install|set ?up|download|laga do|install karo)\b/i;
-  if (INSTALL_RE.test(text) && lastSystemStatus) {
-    if (!lastSystemStatus.is_admin) {
-      renderMessage('assistant',
-        '⚠️ Heads up! AuriOS may need admin privileges to install software. ' +
-        'If installation fails, try restarting as Administrator 🔐');
-    } else if (lastSystemStatus.free_disk_gb < 1.0) {
-      renderMessage('assistant',
-        `⚠️ You only have ${lastSystemStatus.free_disk_gb}GB free — ` +
-        `installations need ~2GB. Consider freeing up space first 💾`);
-    }
-  }
-
   showChat();
+  if (!conversationManager.getActiveId()) {
+    conversationManager.create();
+  }
   renderMessage('user', text);
   conversationManager.addMessage('user', text);
   renderSidebar();
@@ -372,14 +580,23 @@ async function sendMessage() {
 
   chatInput.value = '';
   autoResizeTextarea();
-  updateSendBtnState();
 
-  await new Promise(resolve => setTimeout(resolve, 3500 + Math.random() * 1000));
+  // Enter generating state
+  isGenerating  = true;
+  activeAbort   = new AbortController();
+  updateSendBtnState();
   showTyping(true);
 
   try {
-    const res = await window.api.sendMessage(text);
+    const res = await window.api.sendMessage(text, activeAbort.signal);
+
+    // Guard: if aborted between request and response
+    if (!isGenerating) return;
+
+    isGenerating = false;
+    activeAbort  = null;
     showTyping(false);
+    updateSendBtnState();
 
     const reply = res.response_text || res.response || res.message || JSON.stringify(res);
 
@@ -388,7 +605,7 @@ async function sendMessage() {
       res.error === 'ollama_offline' ||
       (typeof reply === 'string' && /ollama.*not.*running|cannot.*reach.*ollama/i.test(reply))
     ) {
-      finalReply = "Hmm, main apne brain tak nahi pahunch rahi! Ollama chal raha hai? 🧠 Try: ollama serve";
+      finalReply = "Cannot reach Ollama. Is it running? Try: ollama serve";
     } else {
       finalReply = reply;
     }
@@ -403,18 +620,29 @@ async function sendMessage() {
       window.tts.speak(finalReply);
     }
 
-    if (res.task_id) {
-      const presetName = res.preset_or_software || 'Software';
-      const steps = ['detection', 'download', 'install', 'configure', 'validate', 'environment'];
-      if (window.progressPanel && typeof window.progressPanel.showPanel === 'function') {
-        window.progressPanel.showPanel(presetName, steps, res.task_id);
+    try {
+      if (res.task_id) {
+        const presetName = res.preset_or_software || 'Software';
+        const steps = ['detection', 'download', 'install', 'configure', 'validate', 'environment'];
+        if (window.progressPanel && typeof window.progressPanel.showPanel === 'function') {
+          window.progressPanel.showPanel(presetName, steps, res.task_id);
+        }
+        connectProgressSocket(res.task_id);
       }
-      connectProgressSocket(res.task_id);
+    } catch (uiErr) {
+      console.error("UI Error after chat:", uiErr);
+      renderMessage('assistant', `Internal UI Error: ${uiErr.message}`);
     }
   } catch (err) {
+    // Aborted by user — already handled in stopGeneration()
+    if (err && err.name === 'AbortError') return;
+
+    isGenerating = false;
+    activeAbort  = null;
     showTyping(false);
+    updateSendBtnState();
     showBackendBanner();
-    renderMessage('assistant', '⚠️ Could not reach backend. Is the server running?');
+    renderMessage('assistant', 'Could not reach backend. Is the server running?');
   }
 }
 
@@ -425,7 +653,7 @@ function renderMessage(role, content, timestamp, skipScroll) {
 
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  bubble.textContent = content;
+  bubble.textContent = content.replace(/\*+([^*\n]+)\*+/g, '$1');
 
   const ts = document.createElement('span');
   ts.className = 'msg-timestamp';
@@ -462,9 +690,9 @@ function connectProgressSocket(taskId) {
         const msg = (data.message || '').toLowerCase();
         if (msg.includes('no internet') || msg.includes('connection error') ||
             msg.includes('network') || msg.includes('connectionerror')) {
-          data.message = 'Oops! No internet connection 📡';
+          data.message = 'No internet connection — check your network.';
           if (window.progressPanel) window.progressPanel.updateStep(data);
-          renderMessage('assistant', "Looks like we're offline! Already downloaded files still work 📦");
+          renderMessage('assistant', "Looks like we're offline. Already downloaded files still work.");
           return;
         }
         if (msg.includes('retrying') || msg.includes('retry')) {
@@ -472,18 +700,18 @@ function connectProgressSocket(taskId) {
           const match = data.message.match(/\((\d+)\/(\d+)\)/);
           const cur = match ? match[1] : dlFailCount;
           const max = match ? match[2] : 3;
-          data.message = `Download failed. Retrying... (${cur}/${max}) 🔄`;
+          data.message = `Download failed. Retrying... (${cur}/${max})`;
           if (window.progressPanel) window.progressPanel.updateStep(data);
           return;
         }
         if ((data.status === 'failed' || data.status === 'error') && dlFailCount >= 3) {
-          data.message = '❌ Download failed after 3 attempts';
+          data.message = 'Download failed after 3 attempts';
           if (window.progressPanel) window.progressPanel.updateStep(data);
           return;
         }
       }
 
-      if (data.status === 'completed' || data.status === 'done' || data.status === 'failed' || data.status === 'error') completed = true;
+      if (data.status === 'completed' || data.status === 'done' || data.status === 'failed' || data.status === 'error' || data.status === 'cancelled') completed = true;
       if (window.progressPanel && typeof window.progressPanel.updateStep === 'function') {
         window.progressPanel.updateStep(data);
       }
@@ -491,8 +719,10 @@ function connectProgressSocket(taskId) {
     } catch (_) {}
   };
 
+  ws.onerror = () => { completed = true; };
+
   ws.onclose = () => {
-    if (!completed) renderMessage('assistant', '⚠️ Task connection closed unexpectedly.');
+    if (!completed) renderMessage('assistant', 'Installation did not complete. Please try again.');
   };
 }
 
@@ -531,20 +761,38 @@ function applyStatusUI(s) {
 // ── updateStatusBar ───────────────────────────────────────────────────────────
 async function updateStatusBar() {
   try {
-    const s = await window.api.getStatus();
-    lastSystemStatus = s;
-    applyStatusUI(s);
-    hideBackendBanner();
+    let s;
+    if (window.__bgStatusPromise) {
+      s = await window.__bgStatusPromise;
+      window.__bgStatusPromise = null;
+    } else {
+      // Wait for at most 10 seconds for the status
+      s = await Promise.race([
+        window.api.getStatus(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000))
+      ]);
+    }
+    
+    if (s) {
+      lastSystemStatus = s;
+      applyStatusUI(s);
+      try { localStorage.setItem('aurios_system_status', JSON.stringify(s)); } catch(e) {}
+      hideBackendBanner();
+    } else {
+      throw new Error("Empty status");
+    }
   } catch (_) {
     showBackendBanner();
+    // Graceful degradation on timeout or error
+    applyStatusUI({ ollama_connected: false, is_admin: false, free_disk_gb: 0, installed: {} });
   }
 }
 
 // ── Status-item click handlers ────────────────────────────────────────────────
 const STATUS_TIPS = {
   'status-ollama': 'Run: ollama serve in your terminal',
-  'status-disk':   'Free up space in Windows Settings → Storage',
-  'status-python': "Say 'install python' to get started! 😊",
+  'status-disk':   'Free up space in Windows Settings > Storage',
+  'status-python': "Say 'install python' to get started.",
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -561,6 +809,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Browse software button
   document.getElementById('browse-software-btn')?.addEventListener('click', showSoftwareBrowser);
+
+  // Clear chat button
+  document.getElementById('clear-chat-btn')?.addEventListener('click', () => {
+    const activeId = conversationManager.getActiveId();
+    if (!activeId) return;
+    const conv = conversationManager.getActive();
+    if (!conv || conv.messages.length === 0) return;
+    showCustomConfirm('Clear all messages in this chat?', () => {
+      const convs = conversationManager.load();
+      const c = convs.find(x => x.id === activeId);
+      if (c) {
+        c.messages = [];
+        c.title = 'New Chat';
+        conversationManager.save(convs);
+      }
+      if (messagesInner) messagesInner.innerHTML = '';
+      lastAuriReply = '';
+      renderSidebar();
+    }, 'Clear');
+  });
 
   // Sidebar collapse toggle
   document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
@@ -615,7 +883,7 @@ async function showSoftwareBrowser() {
 
   container.innerHTML = `
     <div class="sw-browser-header">
-      <h2>📦 Available Software</h2>
+      <h2>Available Software</h2>
       <p>Click Install to start the setup pipeline for any tool.</p>
     </div>
     <div class="sw-browser-grid sw-loading">Loading catalog…</div>
@@ -662,19 +930,6 @@ async function showSoftwareBrowser() {
   }
 }
 
-// ── Clear chat ────────────────────────────────────────────────────────────────
-const clearBtn = document.getElementById('clear-chat-btn');
-if (clearBtn) {
-  clearBtn.addEventListener('click', async () => {
-    if (!confirm('Clear all chat history?')) return;
-    try { await window.api.clearHistory(); } catch (_) {}
-    if (messagesInner) messagesInner.innerHTML = '';
-    conversationManager.create();
-    renderSidebar();
-    showDashboard();
-  });
-}
-
 // ── Init ──────────────────────────────────────────────────────────────────────
 window.initApp = async function() {
   const greetingEl    = document.querySelector('.greeting-text');
@@ -682,7 +937,7 @@ window.initApp = async function() {
 
   // Load profile
   try {
-    const profile = await window.api.getProfile();
+    const profile = await window.api.getProfile(localStorage.getItem('aurios_auth_token'));
     if (profile && profile.user_name) {
       userName = profile.user_name;
       const title = `AuriOS — ${userName}`;
@@ -691,20 +946,36 @@ window.initApp = async function() {
       if (titleEl) titleEl.textContent = title;
       if (window.api.setTitle) window.api.setTitle(title);
       if (dashUsernameEl) dashUsernameEl.textContent = userName;
+      
+      const nameEl = document.getElementById('profile-name');
+      if (nameEl) nameEl.textContent = userName;
+      const avatarEl = document.getElementById('profile-avatar');
+      if (avatarEl) avatarEl.textContent = userName.charAt(0).toUpperCase();
     }
   } catch (_) {}
 
   if (greetingEl && dashUsernameEl) {
-    greetingEl.innerHTML = `${getGreeting()}, <span id="dash-username">${escapeHtml(userName)}</span> 👋`;
+    greetingEl.innerHTML = `${getGreeting()}, <span id="dash-username">${escapeHtml(userName)}</span>`;
   }
 
   // ── Conversation bootstrap ─────────────────────────────────────────────────
-  // ALWAYS start on the dashboard (like ChatGPT "New Chat")
-  conversationManager.create();
+  conversationManager.cleanup();
   if (messagesInner) messagesInner.innerHTML = '';
   lastAuriReply = '';
+  
+  conversationManager.setActiveId(null);
   showDashboard();
   renderSidebar();
+
+  // Try applying cached status immediately for instant feedback
+  try {
+    const cached = localStorage.getItem('aurios_system_status');
+    if (cached) {
+      const s = JSON.parse(cached);
+      lastSystemStatus = s;
+      applyStatusUI(s);
+    }
+  } catch(e) {}
 
   // Status bar — immediate then every 30 s
   updateStatusBar();
