@@ -5,8 +5,7 @@
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --inspect",
-    "build": "electron-builder --win"
+    "build": "electron-builder --win --x64"
   },
   "keywords": [
     "electron",
@@ -23,11 +22,39 @@
   "build": {
     "appId": "com.aurios.app",
     "productName": "AuriOS",
+    "copyright": "Copyright 2025 The Automators",
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "requestedExecutionLevel": "requireAdministrator"
     },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AuriOS",
+      "deleteAppDataOnUninstall": false
+    },
+    "files": [
+      "electron/**/*",
+      "assets/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/",
+        "to": "backend/",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      }
+    ],
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "assets"
     }
   }
 }

@@ -2,7 +2,31 @@
   "permissions": {
     "allow": [
       "Bash(python setup.py)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(python -m pip list)",
+      "Bash(python -c \"import pytest; print\\('pytest', pytest.__version__\\)\")",
+      "Bash(python -c \"import pytest_asyncio; print\\('pytest-asyncio', pytest_asyncio.__version__\\)\")",
+      "Bash(python -m pip install \"pytest-asyncio==0.23.8\" -q)",
+      "Bash(python -m pytest tests/unit/ -v --tb=short -q)",
+      "Bash(python -m pytest tests/security/ -v --tb=short)",
+      "Bash(python -m pytest tests/performance/ -v --tb=short)",
+      "Bash(python -m pytest tests/e2e/ -v --tb=short -q)",
+      "Bash(python tests/generate_report.py --no-backend)",
+      "Bash(set PYTHONIOENCODING=utf-8)",
+      "Bash(python -X utf8 tests/generate_report.py)",
+      "Bash(python -m pytest tests/security/ -v --tb=short -q)",
+      "Bash(python -X utf8 tests/generate_report.py --skip-tests)",
+      "Bash(python -m uvicorn backend.server:app --host 127.0.0.1 --port 8000)",
+      "Bash(curl -s http://127.0.0.1:8000/ping)",
+      "Bash(python tests/run_all_tests.py)",
+      "Bash(python tests/generate_versioned_reports.py)",
+      "Bash(pip install *)",
+      "Bash(python -c \"import reportlab; import docx; print\\('both available'\\)\")",
+      "Bash(netstat -ano)",
+      "Bash(tasklist /FI \"PID eq 4584\")",
+      "Bash(awk '{print $5}')",
+      "Bash(taskkill //F //PID 4584)",
+      "Bash(python -c ' *)"
     ]
   }
 }
