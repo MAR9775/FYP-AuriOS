@@ -1,0 +1,119 @@
+================================================================================
+AURIOS — VERIFIED WORKING COPY STATUS
+Path: D:\AuriOS-All\AuriOSv1.2
+Verified: 2026-07-24
+================================================================================
+
+This file documents the ONE confirmed-working copy of AuriOS, after multiple
+duplicate copies (in "1\", "ETL-One\", and scattered on C:\) were found and
+removed. This is the copy to demo, build, and push to GitHub from.
+
+
+1. WHAT AURIOS IS
+--------------------------------------------------------------------------------
+AuriOS is a Windows desktop AI assistant (Electron + Python) that automates
+setting up a dev environment — installing software, fixing PATH, creating
+Python venvs — through a natural-language chat interface. It also has a
+full Admin Console for user/software/system management.
+
+
+2. VERIFIED WORKING (tested live on 2026-07-24)
+--------------------------------------------------------------------------------
+  [OK] Backend boots cleanly via the project's own .venv       -> GET /ping = 200 {"status":"ok"}
+  [OK] Electron shell launches, window opens, no crash/Traceback in logs/aurjos.log
+  [OK] SQLite (aiosqlite, WAL mode) reads/writes preferences without error
+  [OK] Clean shutdown sequence (DB connections closed properly)
+
+  KNOWN GOTCHA — must run with the project's .venv, not system Python:
+  electron/main.js spawns the backend with the bare command "python -m uvicorn
+  backend.server:app ...". If the machine's system-wide "python" resolves to a
+  different install (as it did here: FastAPI 0.104.1 + Starlette 1.3.1, an
+  incompatible pair), the backend crashes on boot with:
+      TypeError: Router.__init__() got an unexpected keyword argument 'on_startup'
+  Fix: put .venv\Scripts on PATH before "npm start" (or hardcode the venv's
+  python.exe path in main.js) so it uses the pinned versions below.
+
+
+3. TECH STACK
+--------------------------------------------------------------------------------
+  Desktop shell:     Electron 41.1.1 (electron-builder 26.8.1 for the NSIS installer)
+  Frontend:          Vanilla HTML/CSS/JS (app.js, admin.js, onboarding.js, splash.js,
+                      progress-panel.js, agent-animation.js, speech.js, web-api.js)
+  Backend:           Python 3.12.4, FastAPI 0.136.1, Starlette 1.0.0, Uvicorn 0.46.0
+  Database:          SQLite via aiosqlite 0.22.1 (WAL mode) — aurjos.db
+  Realtime:          WebSockets 16.0 (task/install progress streamed every ~500ms)
+  Local LLM:         Ollama, model llama3.2:3b (http://localhost:11434)
+  Auth/Security:     bcrypt 5.0.0 (password hashing), cryptography 47.0.0 /
+                      Fernet (GitHub PAT encrypted at rest)
+  System monitoring: psutil 7.2.2 (CPU/RAM stats for Admin Console)
+  Software catalog:  GitHub Releases API (winget / choco fallback for fetching)
+  Testing:           pytest 9.0.3, pytest-asyncio, httpx, pytest-json-report
+
+
+4. AGENTS — 6 total, all extend BaseAgent (ReAct: Reason -> Act -> Observe -> Decide)
+--------------------------------------------------------------------------------
+  Orchestrator (backend/core/orchestrator.py) runs these in sequence for every
+  install request, coordinated as a 7-stage pipeline:
+
+  1. DetectionAgent   — checks Windows Registry + PATH for already-installed software
+                         (skips anything already present)
+  2. DownloadAgent     — fetches installer .exe/.msi files from the AuriOS GitHub
+                         Releases repository
+  3. InstallAgent      — runs silent installs (e.g. /VERYSILENT), local installer
+                         first, winget as fallback
+  4. ConfigureAgent    — writes installed tools into the user's PATH via registry,
+                         broadcasts WM_SETTINGCHANGE so it takes effect immediately
+  5. ValidationAgent   — re-runs detection to confirm the install actually succeeded
+  6. EnvironmentAgent  — scaffolds a project folder + Python venv on request
+                         (+ a final "Launch Step" pops open GUI tools like VS Code —
+                          not a separate agent class, just the pipeline's last step)
+
+  Intent routing (backend/llm/intent_parser.py) is rule-based first (regex/keyword
+  match against a fixed vocabulary of presets: python_basic, python_ml, web_dev,
+  full_stack, data_science, java, single_software, database_clarify, greeting,
+  help, thanks, goodbye, unknown) — Ollama is only called for conversational
+  replies or genuinely unclear input, since small local models can't reliably
+  emit a strict JSON enum.
+
+
+5. KEY BACKEND ENDPOINTS (backend/server.py)
+--------------------------------------------------------------------------------
+  Auth:     /auth/signup, /auth/login, /auth/verify, /auth/logout, /auth/change-password
+  Core:     /chat, /history, /ping, /system-status, /system-status-full,
+            /profile, /preferences, /installation-history, /speech/transcribe
+  Admin:    /admin/stats, /admin/users, /admin/sessions, /admin/installations,
+            /admin/conversations, /admin/preferences, /admin/accounts (+ reset-password,
+            revoke, deactivate/reactivate), /admin/dashboard-stats, /admin/system-status
+  Auth model: Bearer token + server-side role check (_require_admin), 5 failed
+  logins per IP / 300s triggers a 60s lockout (429).
+
+
+6. HOW TO RUN IT CORRECTLY
+--------------------------------------------------------------------------------
+  cd D:\AuriOS-All\AuriOSv1.2
+  # make sure .venv\Scripts is first on PATH, then:
+  npm start
+
+  Backend health check: curl http://127.0.0.1:8000/ping  -> {"status":"ok"}
+  Live app data/db lives in: %APPDATA%\aurios  (do not delete — it's the live userData dir)
+  Bundled 3rd-party installers used by DownloadAgent/InstallAgent: .\installers\
+  Runtime log: .\logs\aurjos.log
+
+
+7. GIT STATE
+--------------------------------------------------------------------------------
+  Last commit: 67d33a4 "Add GitHub Pages deployment workflow"
+  There ARE uncommitted local changes on top of that commit (backend agents,
+  electron/main.js, renderer scripts, etc.) — this working copy is AHEAD of what
+  is currently on GitHub. Push these changes before assuming GitHub == working demo.
+
+
+8. RELATED DOCS IN THIS FOLDER
+--------------------------------------------------------------------------------
+  AuriOS_Project_Description.txt — deep architecture/workflow walkthrough (5 pillars,
+                                     step-by-step request lifecycle, admin console flow)
+  AuriOS_Project_Info.txt        — extended project info (longer reference doc)
+
+================================================================================
+END OF DOCUMENT
+================================================================================

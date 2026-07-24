@@ -1,7 +1,7 @@
 ================================================================================
 AURIOS v1.1 - COMPLETE PROJECT INFORMATION
 Final Year Project Documentation
-Generated: 2026-04-19
+Generated: 2026-04-24 (Updated: Full functionality audit, all fixes applied)
 ================================================================================
 
 
@@ -60,6 +60,8 @@ Pydantic                    latest       Request/response data validation models
 aiosqlite                   latest       Async SQLite driver (WAL mode)
 websockets                  latest       WebSocket protocol support
 requests                    latest       Synchronous HTTP (Ollama health checks, GitHub API)
+psutil                      latest       CPU percent + RAM usage for system status dashboard
+cryptography (Fernet)       latest       Symmetric encryption for secure GitHub PAT storage
 asyncio                     stdlib       Async task management and background workers
 subprocess                  stdlib       Running silent installers, launching apps
 shutil                      stdlib       Disk usage, PATH binary detection
@@ -325,8 +327,11 @@ REAL-TIME PROGRESS TRACKING
 
 USER PROFILE AND PREFERENCES
   - Onboarding flow on first launch (name, experience level, interests)
-  - Profile stored in SQLite preferences table
-  - Profile pill dropdown in top-right with edit and reset options
+  - User name and creation date (`created_at`) are stored in the `users` table and synced via auth token
+  - Additional profile data (experience, interests) stored in SQLite preferences table
+  - Profile pill dropdown in top-right with edit, change password, and reset options
+  - Editable profile fields via frontend modal
+  - Secure Change Password functionality with bcrypt hashing
   - Preferences API for arbitrary key-value persistent settings
   - Installation history log accessible from UI
 
@@ -343,12 +348,14 @@ LOCAL AI (OLLAMA INTEGRATION)
   - Model: llama3.2:3b (configurable via OLLAMA_MODEL env var)
   - Strict system prompt constraining model to developer software domain
 
-SPLASH SCREEN AND ONBOARDING
+SPLASH SCREEN AND USER AUTHENTICATION
   - Animated splash with particle constellation, pulsing rings, glitch logo
   - Progress bar with typing animation showing initialization steps
   - Backend health polling before entering main app
-  - First-run onboarding form with profile setup
-  - Automatic skip if already onboarded
+  - User authentication screen with Login and Signup tabs
+  - Secure bcrypt password hashing and session token generation
+  - First-run onboarding form for experience level and interests
+  - Automatic skip if already authenticated and onboarded
 
 CROSS-PLATFORM / DOCKER SUPPORT
   - Simulation mode: non-Windows hosts (Linux/Mac) get simulated installs
@@ -362,6 +369,48 @@ WINDOW MANAGEMENT
   - Minimize to system tray instead of closing
   - Window bounds persistence between sessions
   - Microphone permission auto-approved for Web Speech API
+
+ADMIN CONSOLE
+  - Separate admin UI panel (admin.js + admin.css + section in index.html)
+  - Secure access: admin@jarvis.local role checked server-side on every request
+  - Live dashboard stats: active conversations count, total users, admin accounts
+  - Real trend values computed from actual users_by_day and installs_activity data
+  - Conversations sparkline uses real conversations_by_day data from backend
+  - System monitoring: real-time CPU percent and RAM usage via psutil (10-sec auto-refresh)
+  - User Management: view all users with role/status badges; deactivate/reactivate/delete;
+    force-reset any user's password; all session tokens revoked on deactivation
+  - Admin Management: create new administrator accounts with email format validation,
+    password minimum length (≥8 chars), and password confirmation; revoke admin role
+  - Software Catalog: view catalog entries, trigger GitHub sync, see last-synced timestamp;
+    add/edit software requires all fields (slug, display name, URL, filename)
+  - Software Manager: download any package via winget → choco → GitHub search fallback;
+    upload local installers to GitHub Releases; auto-updates software_catalog DB entry
+  - GitHub Config: store encrypted PAT (Fernet), owner, and repo name; validate via API;
+    warns user with info toast if new token is saved without validation
+  - Installation History: filterable table (text search + status dropdown, client-side)
+  - Running Tasks table with Cancel button for in-progress installations
+
+CHAT INTERFACE
+  - Clear Chat button: confirms via custom modal, clears all messages from active
+    conversation in localStorage and the DOM, updates sidebar
+
+CHAT SIDEBAR IMPROVEMENTS
+  - New Chat immediately creates and persists a conversation object (no lazy creation)
+  - Conversation appears at top of sidebar instantly on click
+  - Title auto-updates to first 42 chars of first user message
+  - Three-dots (⋯) context menu: Rename (inline editable input) and Delete (confirm dialog)
+  - Context menu correctly handles clicks on SVG child elements via .closest('[data-action]')
+  - Menu position calculated from button bounding rect (not inner SVG child)
+  - Stale token/role purged from localStorage when auth/verify fails at splash
+
+SECURITY HARDENING
+  - Login rate limiting: 5 failed attempts per IP within 300 seconds triggers a 60-second
+    lockout (HTTP 429). Attempts are cleared on successful login.
+  - Onboarding error handling: save failures now display a visible error message instead
+    of silently logging to console
+  - Browser fallback (web-api.js): all API calls include Authorization headers from
+    localStorage token. Previously only Electron preload.js had auth headers.
+  - Dead code removal: unused splashComplete IPC definition removed from preload.js
 
 
 ================================================================================
@@ -379,6 +428,27 @@ TABLE: conversations
 
 Indexes: id (primary), timestamp (implicit)
 Used by: /chat (INSERT), /history (SELECT), /history DELETE (DELETE)
+
+TABLE: users
+  id            INTEGER   PRIMARY KEY AUTOINCREMENT
+  name          TEXT      NOT NULL
+  email         TEXT      UNIQUE NOT NULL
+  password_hash TEXT      NOT NULL (bcrypt hashed)
+  created_at    DATETIME  DEFAULT CURRENT_TIMESTAMP
+  role          TEXT      DEFAULT 'user'   (values: 'user', 'admin')
+  status        TEXT      DEFAULT 'active' (values: 'active', 'inactive')
+
+Indexes: id (primary), email (unique)
+Used by: /auth/signup, /auth/login, /profile, /admin/accounts
+Note: role/status columns are migration-safe — added via ALTER TABLE if not present at startup
+
+TABLE: sessions
+  token         TEXT      PRIMARY KEY
+  user_id       INTEGER   NOT NULL (Foreign Key to users.id)
+  created_at    DATETIME  DEFAULT CURRENT_TIMESTAMP
+
+Indexes: token (primary)
+Used by: /auth/login, /auth/verify, /auth/logout, /auth/change-password
 
 TABLE: preferences
   id          INTEGER   PRIMARY KEY AUTOINCREMENT
@@ -415,9 +485,24 @@ TABLE: tasks
 Indexes: id (primary)
 Used by: task_manager (all CRUD), /ws/progress/{task_id} (polling), /cancel/{task_id}
 
+TABLE: software_catalog
+  slug         TEXT     PRIMARY KEY - lowercase alphanumeric identifier
+  display_name TEXT     Human-readable software name
+  filename     TEXT     Asset filename on GitHub release
+  url          TEXT     Direct download URL
+  version      TEXT     Version string (e.g. '1.0')
+  category     TEXT     Category tag (e.g. 'runtime', 'editor')
+  source       TEXT     Origin ('github.com', 'winget', etc.)
+  status       TEXT     'available' or 'unavailable'
+  updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+
+Indexes: slug (primary)
+Used by: /admin/software/upload (INSERT/UPSERT), /available-software (SELECT)
+
 RELATIONSHIPS
-  - preferences table stores both profile fields and system settings (flat key-value)
+  - preferences table stores both profile fields, system settings, and encrypted GitHub PAT
   - tasks table is decoupled from conversations (task_id returned in /chat response)
+  - software_catalog entries are auto-inserted after every successful GitHub upload
   - No foreign keys: SQLite tables are independent, linked only by application logic
   - installation_history is written after orchestrator completes, not during
 
@@ -429,6 +514,31 @@ RELATIONSHIPS
 Base URL: http://127.0.0.1:8000
 Framework: FastAPI 1.1.0
 CORS allowed origins: localhost, 127.0.0.1, app://app (Electron)
+
+--- AUTHENTICATION ---
+
+POST /auth/signup
+  Description: Register a new user account
+  Request body: { "name": "...", "email": "...", "password": "..." }
+  Response: { "status": "ok", "message": "Account created! Please log in." }
+
+POST /auth/login
+  Description: Authenticate user and issue session token (has admin hardcoded bypass)
+  Rate limited: 5 failed attempts per IP within 300s → 60s lockout (HTTP 429)
+  Request body: { "email": "...", "password": "..." }
+  Response: { "token": "...", "user": { id, name, email, role } }
+
+POST /auth/verify
+  Description: Verify an existing session token
+  Request body: { "token": "..." }
+  Response: { "valid": true, "user": { id, name, email, role } }
+
+POST /auth/logout
+  Description: Destroy the session token
+  Request body: { "token": "..." }
+  Response: { "status": "ok" }
+
+--- CORE ---
 
 POST /chat
   Description: Process a user message, parse intent, trigger installation if needed
@@ -474,14 +584,21 @@ GET /system-status-full
   }
 
 GET /profile
-  Description: Read user profile (user_name, experience, interests) from preferences
-  Parameters: None
-  Response: { user_name: string|null, experience: string|null, interests: string|null }
+  Description: Read user name and created_at from the users table using Authorization token; experience/interests from preferences.
+  Headers: Authorization: Bearer <token>
+  Response: { user_name: string|null, created_at: string|null, experience: string|null, interests: string|null }
 
 POST /profile
-  Description: Save/update user profile fields (upsert on each key)
+  Description: Save/update user profile fields. user_name is updated in the users table; other fields are upserted into preferences.
+  Headers: Authorization: Bearer <token>
   Request body: { user_name?: string, experience?: string, interests?: string }
   Response: { "saved": ["user_name", "experience"] }
+
+POST /auth/change-password
+  Description: Securely update the logged-in user's password. Requires correct current password.
+  Headers: Authorization: Bearer <token>
+  Request body: { current_password: "...", new_password: "..." }
+  Response: { "status": "ok", "message": "Password changed successfully" }
 
 POST /profile/reset
   Description: Delete all rows from preferences table (full reset)
@@ -506,13 +623,68 @@ GET /installation-history
 GET /available-software
   Description: Return the current software catalog synced from GitHub
   Parameters: None
-  Response: Array of catalog entries sorted by display_name, each with:
-    { display_name, download_url, version, ... }
+  Response: Array of catalog entries sorted by display_name
 
 POST /cancel/{task_id}
   Description: Cancel a running installation task
   Path param: task_id (UUID string)
   Response: { "cancelled": true/false }
+
+--- ADMIN CONSOLE (require Authorization: Bearer <admin-token>) ---
+
+GET /admin/dashboard-stats
+  Response: { totals: { users, active_sessions, installations, conversations },
+             users_by_day, installs_activity, top_software, success_fail,
+             conversations_by_day }
+
+GET /admin/system-status
+  Response: { cpu_percent, ram_percent, ram_used_gb, ram_total_gb, disk: {...} }
+
+GET /admin/accounts
+  Response: Array of { id, name, email, role, status, created_at }
+
+POST /admin/accounts
+  Description: Create a new administrator account
+  Body: { name, email, password }
+
+DELETE /admin/users/{id}
+  Description: Hard-delete a user (protected: cannot delete admin@jarvis.local)
+
+POST /admin/users/{id}/deactivate
+  Description: Set status='inactive', revoke all sessions immediately
+
+POST /admin/users/{id}/reactivate
+  Description: Set status='active'
+
+POST /admin/accounts/reset-password
+  Body: { user_id, new_password } — force-resets any user's password
+
+GET /admin/installations
+  Response: Array of installation_history rows (newest first)
+
+GET /admin/tasks
+  Response: Array of tasks rows (newest first, all statuses)
+
+GET /admin/catalog/sync-status
+  Response: { last_sync_ts, last_sync_ago_min }
+
+GET /admin/config/github
+  Response: { owner, repo, token_set: bool }
+
+POST /admin/config/github
+  Body: { token, owner, repo } — token encrypted with Fernet before storage
+
+POST /admin/config/github/validate
+  Description: Test GitHub PAT against API, return { valid: bool }
+
+POST /admin/software/download
+  Body: { name } — tries winget, then choco, then GitHub releases search
+  Response: { status, method, file, destination, size_mb }
+
+POST /admin/software/upload
+  Body: { file_path, release_tag, release_name? }
+  Description: Upload installer to GitHub release, auto-upsert software_catalog
+  Response: { asset_name, download_url, slug }
 
 WebSocket /ws/progress/{task_id}
   Description: Stream real-time installation progress updates to frontend
@@ -729,6 +901,7 @@ AuriOSv1.1/
 |   `-- utils/                       Shared utilities
 |       |-- __init__.py              Package marker
 |       |-- admin_check.py           is_admin() and relaunch_as_admin() for UAC
+|       |-- crypto.py                Fernet encrypt_data/decrypt_data for GitHub PAT storage
 |       |-- platform_utils.py        is_windows(), is_simulated_host(), free_disk_gb()
 |       `-- repo_sync.py             Background GitHub catalog sync, fallback catalog dict
 |
@@ -746,17 +919,23 @@ AuriOSv1.1/
 |       |   |-- components.css       Cards, buttons, dropdowns, modals, progress panel
 |       |   |-- agent.css            Avatar animation, agent status indicator styles
 |       |   |-- onboarding.css       Onboarding form layout and step animations
-|       |   `-- progress-panel.css   Installation progress panel step rows and bars
+|       |   |-- progress-panel.css   Installation progress panel step rows and bars
+|       |   `-- admin.css            Admin Console panel: sidebar nav, tables, stat cards,
+|       |                            system status bars, confirm dialogs, toasts
 |       |
 |       `-- scripts/                 JavaScript modules
-|           |-- app.js               Main UI controller: conversations, dashboard, chat, suggestions
+|           |-- app.js               Main UI controller: conversations, sidebar, dashboard,
+|           |                        chat, suggestions, context menu (rename/delete)
+|           |-- admin.js             Admin Console controller: stats, users, admins,
+|           |                        catalog, system status, software manager, GitHub config
 |           |-- agent-animation.js   Canvas-based animated avatar rendering
 |           |-- progress-panel.js    WebSocket client, step rows, cancel button
 |           |-- onboarding.js        Onboarding form submit, profile POST, redirect
 |           |-- profile.js           Profile dropdown edit/save/reset, history display
 |           |-- speech.js            Web Speech API microphone input handler
 |           |-- tts.js               SpeechSynthesis API text-to-speech for Auri replies
-|           `-- web-api.js           Additional fetch wrappers for catalog and status APIs
+|           `-- web-api.js           Browser-mode API shim: full window.api fallback with
+|                                    auth headers, all endpoints including getAvailableSoftware
 |
 |-- data/                            Runtime data (created at first launch)
 |   `-- aurjos.db                    SQLite database file
@@ -792,17 +971,20 @@ STEP 2: SPLASH SCREEN
   "Connecting to Ollama...", "Almost ready..."
   Progress bar animates from 0% to ~72% over 3 seconds.
   Main process spawns Python backend: "python -m uvicorn backend.server:app"
-  Splash polls GET /system-status-full every 500ms (up to 9 times).
+  Splash polls GET /ping every 1s until backend responds.
   When backend responds 200 OK, progress bar jumps to 100%.
-  Splash fades out, calls window.api.splashComplete() via IPC.
+  Splash checks auth token validity via POST /auth/verify.
 
-STEP 3: ONBOARDING (first run only)
-  main.js checks preferences table for key "onboarded".
-  If not found: loads onboarding.html.
-  User enters: name (required), experience level (radio), interests (checkboxes).
-  JavaScript POSTs /profile with { user_name, experience, interests }.
+STEP 3: AUTHENTICATION AND ONBOARDING
+  main.js checks if a valid session exists via `checkAuthAndOnboarding()` in splash.js.
+  If no valid token: loads auth view (`auth.html`/`intro.html` login tab).
+  User can Signup (creates user in DB) or Login (validates bcrypt hash, issues token).
+  After successful login, checks preferences table for key "onboarded".
+  If not found: loads onboarding view.
+  User enters: experience level (radio), interests (checkboxes).
+  JavaScript POSTs /profile with { experience, interests } using Auth token.
   Then POSTs /preferences with { key: "onboarded", value: "true" }.
-  Redirect to index.html.
+  Transitions to Main Dashboard (`appView`).
 
 STEP 4: MAIN DASHBOARD
   index.html loads. Renderer calls window.api.getStatus() and window.api.getProfile().
@@ -935,11 +1117,16 @@ UI / UX LIMITATIONS
   - Software browser does not allow comparing tools or showing descriptions/docs.
 
 SECURITY LIMITATIONS
-  - Backend runs on localhost:8000 with no authentication. Any process on the
-    same machine can make API calls to it.
+  - Backend runs on localhost:8000. Regular endpoints have no auth. Admin endpoints
+    require a valid Bearer token with role='admin' checked server-side.
+  - GitHub Personal Access Token (PAT) is encrypted at rest using Fernet
+    symmetric encryption (cryptography library) before being stored in preferences.
+  - Login endpoint is rate-limited (5 attempts / 60s lockout per IP) to prevent
+    brute-force attacks. Successful login clears the attempt counter.
   - CORS allows null origin (needed for Electron file:// but could be abused).
   - Installer files are downloaded without cryptographic signature verification.
   - No sandboxing of installer execution: silent install runs with full admin.
+  - The admin account admin@jarvis.local is protected from deletion and demotion.
 
 
 ================================================================================
@@ -999,12 +1186,12 @@ SYSTEM AND INFRASTRUCTURE
   - Add CI/CD pipeline for automated testing of agent pipeline on each commit.
 
 SECURITY AND RELIABILITY
-  - Add authentication to the backend API (token-based) to prevent localhost abuse.
   - Implement installer signature verification using Windows Authenticode checking.
   - Encrypt the SQLite database using SQLCipher for user privacy.
   - Add automated tests for agent behavior using mocked subprocess and registry calls.
   - Add integration tests that test the full pipeline in a Windows VM environment.
   - Rate-limit the /chat endpoint to prevent abuse or runaway install loops.
+    (Note: /auth/login is already rate-limited as of the 2026-04-24 audit fix.)
 
 
 ================================================================================

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1920, height=1080, initial-scale=1.0">
+    <title>AuriOS Intro</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&family=JetBrains+Mono:wght@400&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #0d0f1a;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Inter', sans-serif;
+            color: #ffffff;
+        }
+
+        #container {
+            width: 1920px;
+            height: 1080px;
+            position: relative;
+            background-color: #0d0f1a;
+            overflow: hidden;
+            transform-origin: center center;
+        }
+
+        /* [0:00 - 0:03] LINE DRAW */
+        #center-line {
+            position: absolute;
+            left: 0;
+            top: 540px;
+            height: 1px;
+            background-color: #6366f1;
+            width: 0;
+            z-index: 1;
+        }
+
+        /* [0:03 - 0:07] BLOCK BUILD */
+        .block {
+            position: absolute;
+            height: 80px;
+            background-color: #1e1b4b;
+            bottom: 540px; /* sit on center line perfectly */
+            z-index: 2;
+        }
+
+        /* [0:07 - 0:12] LETTER REVEAL */
+        #letters-wrapper {
+            position: absolute;
+            top: 410px; /* Vertically center 140px text around 540px */
+            width: 1920px;
+            display: flex;
+            justify-content: center;
+            gap: 15px; /* tracked out slightly */
+            z-index: 3;
+            pointer-events: none;
+        }
+
+        .letter {
+            font-size: 140px;
+            font-weight: 800;
+            color: transparent;
+            position: relative;
+            letter-spacing: 5px;
+            line-height: 1;
+        }
+
+        .letter .flash {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #ffffff;
+            opacity: 0;
+            z-index: 10;
+        }
+
+        /* [0:12 - 0:14] LOGO LOCK */
+        #underline {
+            position: absolute;
+            height: 4px;
+            background-color: #6366f1;
+            width: 0;
+            top: 590px; /* closely beneath text */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 4;
+        }
+
+        /* [0:14 - 0:16] SUBTITLE TYPE-ON */
+        #subtitle {
+            position: absolute;
+            top: 640px;
+            width: 100%;
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 32px;
+            color: #94a3b8;
+            letter-spacing: 4px;
+            z-index: 5;
+        }
+
+        #cursor {
+            opacity: 0;
+            color: #94a3b8;
+        }
+
+        #fade-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #0d0f1a;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="center-line"></div>
+        
+        <div id="b1" class="block" style="width: 100px; left: -200px;"></div>
+        <div id="b2" class="block" style="width: 110px; left: -200px;"></div>
+        <div id="b3" class="block" style="width: 90px; left: -200px;"></div>
+        <div id="b4" class="block" style="width: 60px; right: -200px;"></div>
+        <div id="b5" class="block" style="width: 120px; right: -200px;"></div>
+        <div id="b6" class="block" style="width: 90px; right: -200px;"></div>
+
+        <div id="letters-wrapper">
+            <div class="letter" id="l1">A<div class="flash" id="f1"></div></div>
+            <div class="letter" id="l2">u<div class="flash" id="f2"></div></div>
+            <div class="letter" id="l3">r<div class="flash" id="f3"></div></div>
+            <div class="letter" id="l4">i<div class="flash" id="f4"></div></div>
+            <div class="letter" id="l5">O<div class="flash" id="f5"></div></div>
+            <div class="letter" id="l6">S<div class="flash" id="f6"></div></div>
+        </div>
+
+        <div id="underline"></div>
+        <div id="subtitle"><span id="typed"></span><span id="cursor">|</span></div>
+        <div id="fade-overlay"></div>
+    </div>
+
+    <script>
+        function scaleViewport() {
+            const container = document.getElementById('container');
+            const scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+            container.style.transform = `scale(${scale})`;
+        }
+        window.onresize = scaleViewport;
+        scaleViewport();
+
+        const timeline = [];
+        function at(timeMs, fn) { setTimeout(fn, timeMs); }
+
+        window.onload = () => {
+            const line = document.getElementById('center-line');
+            const blocks = Array.from({length: 6}, (_, i) => document.getElementById(`b${i+1}`));
+            const letters = Array.from({length: 6}, (_, i) => document.getElementById(`l${i+1}`));
+            const flashes = Array.from({length: 6}, (_, i) => document.getElementById(`f${i+1}`));
+
+            // [0:00 - 0:03] LINE DRAW
+            at(100, () => {
+                line.style.transition = 'width 2.9s cubic-bezier(0.65, 0, 0.35, 1)';
+                line.style.width = '1920px';
+            });
+
+            // [0:03 - 0:07] BLOCK BUILD
+            at(3000, () => {
+                blocks.forEach(b => b.style.transition = 'all 2s cubic-bezier(0.65, 0, 0.35, 1)');
+                // Move into frame
+                blocks[0].style.left = '500px';
+                blocks[1].style.left = '640px';
+                blocks[2].style.left = '780px';
+                blocks[3].style.right = '780px';
+                blocks[4].style.right = '640px';
+                blocks[5].style.right = '500px';
+            });
+
+            at(5000, () => {
+                // Shift to align loosely with letters
+                blocks[0].style.left = '620px';
+                blocks[1].style.left = '740px';
+                blocks[2].style.left = '850px';
+                blocks[3].style.right = '850px';
+                blocks[4].style.right = '740px';
+                blocks[5].style.right = '620px';
+            });
+
+            // [0:07 - 0:12] LETTER REVEAL
+            at(7000, () => {
+                line.style.transition = 'opacity 1s cubic-bezier(0.65, 0, 0.35, 1)';
+                line.style.opacity = '0'; // fade out the line smoothly
+
+                for(let i=0; i<6; i++) {
+                    at(i * 800, () => {
+                        // Single frame flash
+                        flashes[i].style.transition = 'none';
+                        flashes[i].style.opacity = '1';
+                        blocks[i].style.display = 'none';
+                        letters[i].style.color = '#ffffff';
+
+                        at(50, () => flashes[i].style.opacity = '0');
+                    });
+                }
+            });
+
+            // [0:12 - 0:14] LOGO LOCK
+            at(12000, () => {
+                const underline = document.getElementById('underline');
+                underline.style.transition = 'width 0.5s cubic-bezier(0.65, 0, 0.35, 1)';
+                underline.style.width = '560px';
+            });
+
+            // [0:14 - 0:16] SUBTITLE TYPE-ON
+            at(14000, () => {
+                const text = "AI OS Assistant";
+                const typed = document.getElementById('typed');
+                const cursor = document.getElementById('cursor');
+                cursor.style.opacity = '1';
+
+                const blink = setInterval(() => {
+                    cursor.style.opacity = cursor.style.opacity === '1' ? '0' : '1';
+                }, 400);
+
+                for(let i=0; i<text.length; i++) {
+                    at(i * 100, () => typed.textContent += text[i]);
+                }
+
+                at(2000, () => {
+                    clearInterval(blink);
+                    cursor.style.opacity = '0';
+                });
+            });
+
+            // [0:16 - 0:18] HOLD + FADE
+            at(17500, () => {
+                document.getElementById('fade-overlay').style.opacity = '1';
+            });
+        };
+    </script>
+</body>
+</html>

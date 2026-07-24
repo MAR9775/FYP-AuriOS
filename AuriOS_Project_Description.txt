@@ -1,0 +1,203 @@
+================================================================================
+AURIOS v1.1 - PROJECT DESCRIPTION & ARCHITECTURE WORKFLOW
+Updated: 2026-04-24 (Post-audit: all functionality fixes applied)
+================================================================================
+
+This document provides a clear, high-level explanation of how AuriOS is built,
+how the components interact with each other, and the overall data flow of the application.
+
+1. WHAT IS AURIOS?
+--------------------------------------------------------------------------------
+AuriOS is an AI-powered desktop assistant aimed at students and new developers.
+Its goal is to completely automate the frustrating process of setting up development
+environments on Windows (downloading software, running installers, fixing PATH variables,
+and creating virtual environments) simply by asking via natural language.
+
+In addition to the conversational interface, AuriOS includes a secured Admin Console
+that allows system administrators to manage users, monitor system health, control the
+software catalog, and push updates directly from a GitHub repository.
+
+
+2. THE FIVE MAIN PILLARS OF AURIOS
+--------------------------------------------------------------------------------
+AuriOS relies on five core technical pillars running locally on the user's machine:
+
+  A. The Frontend (Electron + Vanilla Web Tech)
+     The user-facing UI built with HTML, CSS, and JS inside an Electron container.
+     Includes the main chat interface (app.js), the animated agent avatar, the
+     sidebar conversation manager, and the software browser.
+
+  B. The Backend (Python FastAPI)
+     The engine that manages tasks, parses intents, and runs the installation pipeline.
+     Also hosts all admin API endpoints protected by server-side role verification.
+
+  C. The Intelligence Engine (Local Ollama LLM)
+     A completely local instance of Llama 3.2 running via Ollama. It analyzes
+     complex natural language commands and acts as a conversational assistant.
+
+  D. The Database (SQLite)
+     A local database file (aurjos.db) that securely stores chat history, user
+     preferences, login credentials, installation records, running tasks, and the
+     software catalog. All admin credentials are bcrypt-hashed. The GitHub PAT
+     is encrypted at rest using Fernet (cryptography library).
+
+  E. The Admin Console (admin.js + admin.css)
+     A separate control panel inside the Electron app, accessible only to accounts
+     with role='admin'. Provides live system monitoring (CPU/RAM via psutil), full
+     user lifecycle management (create/deactivate/delete/reset-password), software
+     catalog control (GitHub sync, download via winget/choco, upload to GitHub Releases),
+     real-time installation task visibility, and dashboard analytics with real
+     week-over-week trend data and conversations sparkline charts. Admin form
+     validations enforce email format, password strength (≥8 chars), and filename
+     requirements on the software catalog.
+
+
+3. HOW EVERYTHING CONNECTS & WORKS TOGETHER (THE WORKFLOW)
+--------------------------------------------------------------------------------
+
+Whenever a user interacts with AuriOS, here is the exact lifecycle of how data
+moves through the system:
+
+[Step 1] Application Launch & Auth (Splash Screen)
+The splash screen (splash.html + splash.js) polls the backend health endpoint.
+Once the backend responds, it checks localStorage for an existing session token
+and calls POST /auth/verify. If the token is invalid, stale token AND role are
+immediately purged from localStorage before redirecting to the login screen.
+This prevents any privilege bypass across reboots. If valid, the user is taken
+directly to the main app (or onboarding if not yet completed).
+
+[Step 2] User Interaction (Frontend)
+The user types "set up a web dev environment" in the chat window, or speaks it
+using the microphone. The Vanilla JS script (app.js) catches this and sends an
+IPC (Inter-Process Communication) message via preload.js to avoid security risks.
+The Electron Main Process forwards this as an HTTP POST request to the Python Backend.
+
+When the user clicks "New Chat", a conversation object is immediately created and
+persisted to localStorage. The new entry appears at the top of the sidebar instantly
+(no lazy creation). The title updates automatically to the first 42 characters of
+the user's first message. The three-dots (⋯) context menu on each sidebar item
+provides Rename (inline edit) and Delete (confirmation dialog) actions. The Clear
+Chat button confirms via a custom modal, then wipes all messages from the active
+conversation in both localStorage and the DOM.
+
+The chat interface also has a browser-mode fallback: when running outside Electron
+(e.g., in a browser), web-api.js provides a complete window.api shim that includes
+authorization headers on all API calls and exposes every endpoint including
+getAvailableSoftware, which was previously Electron-only.
+
+[Step 3] Intent Parsing & LLM (Backend)
+The FastAPI server receives the request on the /chat endpoint. It passes the text
+to the intent_parser.py.
+- It first checks against hardcoded rules and regex patterns for quick matching.
+- If the phrase is complex, it queries the local Ollama LLM HTTP server to understand
+  what exactly the user wants.
+In this case, it identifies the intent as "web_dev" preset (Node.js, VS Code, Git).
+
+[Step 4] Dispatching the Orchestrator
+The backend generates a unique task_id, stores it in the database, and returns it
+immediately to the frontend so the UI can show a loading/progress panel.
+Simultaneously, it spins up the Orchestrator in a background thread.
+
+[Step 5] The 7-Stage Agent Pipeline (The Orchestrator)
+The Orchestrator is the heart of AuriOS. It runs a series of specialized scripts
+called "Agents" sequentially:
+
+  1. DetectionAgent: Checks the Windows Registry and System PATH to see if Node.js
+     or Git are already installed. (Saves bandwidth by skipping installed tools).
+  2. DownloadAgent: Fetches the required installer executables from a hosted GitHub
+     Releases repository.
+  3. InstallAgent: Runs the downloaded .exe/.msi files with specific "silent" flags
+     (e.g., /VERYSILENT for VS Code) so no setup wizards pop up.
+  4. ConfigureAgent: Edits the Windows Registry to inject installed software directly
+     into the user's PATH environment variables, making them accessible via CMD/PowerShell.
+  5. ValidationAgent: Re-runs the Detection checks to confirm the tools were actually
+     installed successfully.
+  6. EnvironmentAgent: Creates a project skeleton folder on the desktop and a Python venv
+     if applicable.
+  7. Launch Step: Automatically pops open GUI tools like VS Code to show the user
+     their environment is ready.
+
+[Step 6] Real-Time Streaming (WebSocket)
+While the 7-stage pipeline is executing, the task status is continuously updating
+in the SQLite Database. The FastAPI server maintains an open WebSocket connection
+with the Electron frontend. Every 500ms, it streams the latest progress percentages
+(e.g., "Downloading VS Code... 45%"). The frontend reads this WebSocket stream to
+smoothly animate the progress bars in the UI.
+
+[Step 7] Finalization
+Once all agents complete, the Orchestrator marks the task as "done". The WebSocket
+tells the UI to slide the progress panel away. The backend pushes a final success
+message to the chat ("Your web dev environment is ready!"), and the system saves
+an entry to the installation_history database table for analytics.
+
+
+4. ADMIN CONSOLE WORKFLOW
+--------------------------------------------------------------------------------
+The Admin Console is a separate view inside the Electron app, accessible from the
+auth splash screen when the user logs in as admin@jarvis.local (or any user with
+role='admin').
+
+[Admin Step 1] Auth Check
+Every admin API call carries Authorization: Bearer <token>. The backend _require_admin()
+dependency verifies the token, looks up the user's role in the users table, and
+rejects non-admin requests with 403. The admin@jarvis.local account is permanently
+protected from deletion, demotion, and deactivation. The login endpoint itself is
+rate-limited: 5 failed attempts per IP within 300 seconds triggers a 60-second
+lockout, returning HTTP 429 to prevent brute-force attacks.
+
+[Admin Step 2] Dashboard Overview
+On load, admin.js calls GET /admin/dashboard-stats for live counts (users, sessions,
+installations, conversations) and renders them as animated stat cards with real
+week-over-week trend values (computed from users_by_day and installs_activity arrays).
+Sparkline charts for users, installations, and conversations are all driven by real
+backend data (conversations_by_day was added to the endpoint for this purpose).
+
+[Admin Step 3] System Monitoring
+The System Status section calls GET /admin/system-status which uses psutil to read
+real-time CPU percent and RAM usage. An automatic 10-second interval refreshes these
+metrics while the section is visible.
+
+[Admin Step 4] User Management
+The Users section loads all user accounts from GET /admin/accounts, rendering a table
+with Role and Status badges per row. Each row has context-aware action buttons:
+  - Deactivate (POST /admin/users/{id}/deactivate) — blocks login, revokes sessions
+  - Reactivate (POST /admin/users/{id}/reactivate)
+  - Reset Password (POST /admin/accounts/reset-password)
+  - Delete (DELETE /admin/users/{id}) — hard delete, protected for admin@jarvis.local
+
+[Admin Step 5] Software Manager
+The Software Manager section has two tabs:
+  - Download: admin enters a package name; backend tries winget, then choco, then
+    GitHub releases search. Result pre-fills the Upload tab's file path.
+  - Upload: admin selects a local installer file and a GitHub release tag; backend
+    uploads the asset to GitHub Releases and auto-inserts/updates the software_catalog
+    table so the new software is immediately available to users.
+The GitHub Personal Access Token (PAT) is stored encrypted using Fernet (AES-128-CBC)
+and can be configured/validated from the GitHub Settings modal.
+
+[Admin Step 6] Catalog Sync
+The Software Catalog section shows all catalog entries and a "Last synced: X min ago"
+header. The Sync button triggers GET /catalog/sync from repo_sync.py which re-fetches
+the GitHub releases catalog and updates the in-memory catalog used by /available-software.
+
+
+5. SUMMARY OF THE TECHNICAL STACK
+--------------------------------------------------------------------------------
+- UI Container:         Electron
+- Styling & Logic:      Vanilla CSS, Vanilla JS (app.js, admin.js)
+- Backend Framework:    Python, FastAPI, Uvicorn
+- Database:             SQLite (aiosqlite, WAL mode)
+- Real-time Comms:      WebSockets
+- Local AI Model:       Ollama (llama3.2:3b)
+- Software Catalog:     GitHub Releases API
+- System Monitoring:    psutil (CPU, RAM)
+- Secure Storage:       cryptography (Fernet encryption for GitHub PAT)
+
+By strictly isolating the UI layer, the web server layer, the OS-level
+installation layer, and the administrative control plane, AuriOS achieves a
+modular architecture that remains fast, lightweight, and extremely reliable.
+All 130+ UI elements have been audited and verified functional as of 2026-04-24.
+
+================================================================================
+END OF DOCUMENT
+================================================================================
