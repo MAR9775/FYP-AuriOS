@@ -45,6 +45,27 @@ _LAUNCH_STATIC: dict[str, list[str]] = {
         os.path.join(_PROG,   "MySQL", "MySQL Workbench 8.0", "MySQLWorkbench.exe"),
         os.path.join(_PROG86, "MySQL", "MySQL Workbench 8.0", "MySQLWorkbench.exe"),
     ],
+    "wiztree":   [
+        os.path.join(_PROG,   "WizTree", "WizTree64.exe"),
+        os.path.join(_PROG86, "WizTree", "WizTree.exe"),
+        os.path.join(_PROG,   "WizTree", "WizTree.exe"),
+    ],
+    "windsurf":  [
+        os.path.join(_LOCAL, "Programs", "Windsurf", "Windsurf.exe"),
+        os.path.join(_PROG,  "Windsurf", "Windsurf.exe"),
+    ],
+    "greenshot": [
+        os.path.join(_PROG,   "Greenshot", "Greenshot.exe"),
+        os.path.join(_PROG86, "Greenshot", "Greenshot.exe"),
+    ],
+    "everything": [
+        os.path.join(_PROG,   "Everything", "Everything.exe"),
+        os.path.join(_PROG86, "Everything", "Everything.exe"),
+    ],
+    "lm": [
+        os.path.join(_LOCAL, "Programs", "lm-studio", "LM Studio.exe"),
+        os.path.join(_LOCAL, "LM-Studio", "LM Studio.exe"),
+    ],
 }
 
 
@@ -64,16 +85,27 @@ def _launch(software: str) -> None:
     if not is_windows():
         return
     import shutil as _shutil
-    for exe in _launch_candidates(software):
-        if not exe:
-            continue
-        if os.path.sep not in exe:
-            if _shutil.which(exe):
-                subprocess.Popen([exe], creationflags=subprocess.DETACHED_PROCESS)
-                return
-        elif os.path.isfile(exe):
-            subprocess.Popen([exe], creationflags=subprocess.DETACHED_PROCESS)
-            return
+    import time
+    try:
+        # Wait up to 30 seconds for the executable to exist (for background installers)
+        for _ in range(15):
+            for exe in _launch_candidates(software):
+                if not exe:
+                    continue
+                if os.path.sep not in exe:
+                    resolved = _shutil.which(exe)
+                    if resolved:
+                        if resolved.lower().endswith((".cmd", ".bat")):
+                            subprocess.Popen(resolved, shell=True, creationflags=subprocess.DETACHED_PROCESS)
+                        else:
+                            subprocess.Popen([resolved], creationflags=subprocess.DETACHED_PROCESS)
+                        return
+                elif os.path.isfile(exe):
+                    subprocess.Popen([exe], creationflags=subprocess.DETACHED_PROCESS)
+                    return
+            time.sleep(2)
+    except Exception:
+        pass
 
 # Friendly display names for every software and preset the orchestrator knows
 # about. Imported by ``backend.server`` for response-text generation so both
@@ -91,6 +123,22 @@ PRETTY = {
     "mongodb":      "MongoDB",
     "redis":        "Redis",
     "postman":      "Postman",
+    "lm":           "LM Studio",
+    "oracle":       "Oracle VirtualBox",
+    # Additional catalog tools
+    "everything":   "Everything",
+    "wiztree":      "WizTree",
+    "windsurf":     "Windsurf",
+    "greenshot":    "Greenshot",
+    "githubdesktop":"GitHub Desktop",
+    "dbeaver":      "DBeaver",
+    "dotnet":       ".NET",
+    "notion":       "Notion",
+    "powertoys":    "PowerToys",
+    "rufus":        "Rufus",
+    "7zip":         "7-Zip",
+    "notepadpp":    "Notepad++",
+    "vlc":          "VLC Media Player",
     # presets
     "python_basic": "Python basics",
     "python_ml":    "Python ML",
@@ -106,7 +154,7 @@ PRESET_CONFIGS = {
     },
     "python_ml":     {
         "software": ["python", "vscode", "git"],
-        "pip_packages": ["tensorflow==2.15.0", "jupyter"],
+        "pip_packages": ["tensorflow==2.15.0", "torch", "scikit-learn", "jupyter"],
     },
     "web_dev":       {
         "software": ["nodejs", "vscode", "git"],
@@ -152,7 +200,7 @@ class Orchestrator:
             progress_callback(step, status, pct, msg)
 
         # ── Stage 1: Detection & System Specs ─────────────────────────────────
-        _cb("detection", "running", 5, "Scanning installed software and verifying system specs…")
+        _cb("detection", "running", 5, "Resolving package...")
         detection_result = await asyncio.to_thread(DetectionAgent().run, {})
         installed = detection_result.get("installed", {})
         free_gb = detection_result.get("free_disk_gb", 0)
@@ -186,7 +234,7 @@ class Orchestrator:
 
         if failed_installs:
             _cb("detection", "failed", 15, f"Validation failed for: {failed_installs}")
-            task_manager.set_final_message(task_id, f"⚠️ Pre-install validation failed for {', '.join(failed_installs)}")
+            task_manager.set_final_message(task_id, f"Pre-install validation failed for {', '.join(failed_installs)}")
             return
             
         _cb("detection", "done", 15, f"Need to install: {to_install if to_install else 'nothing — all present'}")
@@ -196,7 +244,7 @@ class Orchestrator:
         installer_paths = {}
 
         if to_install:
-            _cb("download", "running", 20, f"Downloading {to_install}…")
+            _cb("download", "running", 20, "Downloading...")
             total_items = len(to_install)
 
             for i, software in enumerate(to_install):
@@ -215,7 +263,7 @@ class Orchestrator:
                     installer_paths[software] = filepath
                 except Exception as e:
                     _cb("download", "failed", base_pct, f"{software}: download failed — {e}")
-                    task_manager.set_final_message(task_id, f"⚠️ Download failed for {software}: {e}")
+                    task_manager.set_final_message(task_id, f"Download failed for {software}: {e}")
                     return
 
             _cb("download", "done", 40, "Downloads complete.")
@@ -224,20 +272,38 @@ class Orchestrator:
 
         # ── Stage 3: Install ──────────────────────────────────────────────────
         if installer_paths:
-            _cb("install", "running", 42, f"Installing {list(installer_paths)}…")
+            _cb("install", "running", 42, "Installing silently...")
             total_installs = len(installer_paths)
             inst_agent = InstallAgent()
 
             for i, (software, filepath) in enumerate(installer_paths.items()):
                 pct = 42 + int((i / total_installs) * 18)
-                _cb("install", "running", pct, f"Installing {software}…")
-                result = await asyncio.to_thread(inst_agent.install, filepath)
-                if result["success"]:
+                _cb("install", "running", pct, f"Installing {software} silently...")
+                
+                # Auto-retry logic
+                result = await asyncio.to_thread(inst_agent.install, software, filepath)
+                if not result["success"]:
+                    if os.path.exists(filepath):
+                        _cb("install", "running", pct, f"Retry: Installing {software} silently...")
+                        result = await asyncio.to_thread(inst_agent.install, software, filepath)
+                    
+                if result.get("success"):
                     _cb("install", "running", pct + int(18 / total_installs),
                         f"{software} installed ✓")
                 else:
-                    _cb("install", "failed", pct, f"{software} failed: {result['error']}")
-                    task_manager.set_final_message(task_id, f"⚠️ Installation failed for {software}")
+                    err = result.get('error', {})
+                    if isinstance(err, str):
+                        err = {"reason": "Execution Error", "details": err, "suggestion": "Check system permissions."}
+                    _cb("install", "failed", pct, f"{software} failed: {err.get('reason', 'Unknown error')}")
+                    
+                    error_msg = (
+                        f"Installation failed.\n"
+                        f"Reason: {err.get('reason', 'Installer exited with unknown code')}\n"
+                        f"Details: {err.get('details', 'Unknown error')}\n"
+                        f"Suggestion: {err.get('suggestion', 'Check logs or retry.')}"
+                    )
+                    task_manager.set_final_message(task_id, error_msg)
+                    task_manager.update_task(task_id, "failed", pct, "failed")
                     return
 
             _cb("install", "done", 60, "Installation complete.")
@@ -246,7 +312,7 @@ class Orchestrator:
 
 
         # ── Stage 4: Configure ────────────────────────────────────────────────
-        _cb("configure", "running", 62, f"Configuring PATH and pip packages {pip_packages}…")
+        _cb("configure", "running", 62, "Finalizing setup...")
         configure_result = await asyncio.to_thread(
             ConfigureAgent().run, {"pip_packages": pip_packages, "software_list": software_list}
         )
@@ -289,22 +355,7 @@ class Orchestrator:
         _cb("environment", "done", 100, env_msg)
 
         # ── Build final user-facing message ───────────────────────────────────
-        installed_names = [PRETTY.get(s, s) for s in software_list]
-        if len(installed_names) == 1:
-            final_msg = (
-                f"✅ {installed_names[0]} has been installed, configured, and validated!"
-            )
-        elif len(installed_names) == 2:
-            final_msg = (
-                f"✅ {installed_names[0]} and {installed_names[1]} are installed and ready!"
-            )
-        else:
-            final_msg = (
-                f"✅ {', '.join(installed_names[:-1])}, and {installed_names[-1]} "
-                f"are installed and ready!"
-            )
-        if pip_packages:
-            final_msg += f" Extra packages: {', '.join(pip_packages)}."
+        final_msg = "Installation complete."
 
         # ── Stage 7: Launch installed apps ───────────────────────────────────
         launchable = [s for s in software_list if s in _LAUNCH_STATIC]
