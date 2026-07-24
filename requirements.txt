@@ -4,3 +4,11 @@ pydantic
 aiosqlite
 websockets
 requests
+bcrypt
+psutil
+cryptography
+pytest>=9.0
+pytest-asyncio>=0.23
+pytest-json-report>=1.5
+httpx>=0.25
+anyio>=3.7
