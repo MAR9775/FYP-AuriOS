@@ -65,16 +65,101 @@ _WIN_PATHS: Dict[str, List[str]] = {
         os.path.join(_PROG,   "Notepad++", "notepad++.exe"),
         os.path.join(_PROG86, "Notepad++", "notepad++.exe"),
     ],
+    "vscode": [
+        os.path.join(_LOCAL, "Programs", "Microsoft VS Code", "Code.exe"),
+        os.path.join(_PROG, "Microsoft VS Code", "Code.exe"),
+        os.path.join(_PROG86, "Microsoft VS Code", "Code.exe"),
+    ],
+    "nodejs": [
+        os.path.join(_PROG, "nodejs", "node.exe"),
+        os.path.join(_PROG86, "nodejs", "node.exe"),
+    ],
+    "python": [
+        os.path.join(_LOCAL, "Programs", "Python", "Python312", "python.exe"),
+        os.path.join(_LOCAL, "Programs", "Python", "Python311", "python.exe"),
+        os.path.join(_LOCAL, "Programs", "Python", "Python310", "python.exe"),
+    ],
+    "git": [
+        os.path.join(_PROG, "Git", "cmd", "git.exe"),
+        os.path.join(_PROG86, "Git", "cmd", "git.exe"),
+        os.path.join(_LOCAL, "Programs", "Git", "cmd", "git.exe"),
+    ],
+    # Database servers — installed to Program Files, no PATH entry by default
+    "mysql": [
+        os.path.join(_PROG,   "MySQL", "MySQL Server 9.5", "bin", "mysql.exe"),
+        os.path.join(_PROG,   "MySQL", "MySQL Server 9.0", "bin", "mysql.exe"),
+        os.path.join(_PROG,   "MySQL", "MySQL Server 8.4", "bin", "mysql.exe"),
+        os.path.join(_PROG,   "MySQL", "MySQL Server 8.0", "bin", "mysql.exe"),
+        os.path.join(_PROG86, "MySQL", "MySQL Server 9.5", "bin", "mysql.exe"),
+        os.path.join(_PROG86, "MySQL", "MySQL Server 8.0", "bin", "mysql.exe"),
+    ],
+    "postgresql": [
+        os.path.join(_PROG,   "PostgreSQL", "17", "bin", "psql.exe"),
+        os.path.join(_PROG,   "PostgreSQL", "16", "bin", "psql.exe"),
+        os.path.join(_PROG,   "PostgreSQL", "15", "bin", "psql.exe"),
+        os.path.join(_PROG86, "PostgreSQL", "17", "bin", "psql.exe"),
+        os.path.join(_PROG86, "PostgreSQL", "16", "bin", "psql.exe"),
+    ],
+    "mongodb": [
+        os.path.join(_PROG,   "MongoDB", "Server", "8.0", "bin", "mongod.exe"),
+        os.path.join(_PROG,   "MongoDB", "Server", "7.0", "bin", "mongod.exe"),
+        os.path.join(_PROG,   "MongoDB", "Server", "6.0", "bin", "mongod.exe"),
+        os.path.join(_PROG86, "MongoDB", "Server", "7.0", "bin", "mongod.exe"),
+    ],
+    "redis": [
+        os.path.join(_PROG,   "Redis", "redis-server.exe"),
+        os.path.join(_PROG86, "Redis", "redis-server.exe"),
+    ],
+    "wiztree": [
+        os.path.join(_PROG,   "WizTree", "WizTree64.exe"),
+        os.path.join(_PROG86, "WizTree", "WizTree.exe"),
+        os.path.join(_PROG,   "WizTree", "WizTree.exe"),
+    ],
+    "windsurf": [
+        os.path.join(_LOCAL, "Programs", "Windsurf", "Windsurf.exe"),
+        os.path.join(_PROG,  "Windsurf", "Windsurf.exe"),
+    ],
+    "greenshot": [
+        os.path.join(_PROG,   "Greenshot", "Greenshot.exe"),
+        os.path.join(_PROG86, "Greenshot", "Greenshot.exe"),
+    ],
+    "everything": [
+        os.path.join(_PROG,   "Everything", "Everything.exe"),
+        os.path.join(_PROG86, "Everything", "Everything.exe"),
+    ],
+    "lm": [
+        os.path.join(_LOCAL, "Programs", "lm-studio", "LM Studio.exe"),
+        os.path.join(_LOCAL, "LM-Studio", "LM Studio.exe"),
+    ],
+    "oracle": [
+        os.path.join(_PROG,   "Oracle", "VirtualBox", "VirtualBox.exe"),
+        os.path.join(_PROG86, "Oracle", "VirtualBox", "VirtualBox.exe"),
+    ],
 }
 
 # Registry display-name substrings for each slug (case-insensitive match).
 _REGISTRY_NAMES: Dict[str, str] = {
-    "rufus":     "rufus",
-    "vlc":       "vlc media player",
-    "7zip":      "7-zip",
-    "notepadpp": "notepad++",
-    "docker":    "docker desktop",
-    "postman":   "postman",
+    "rufus":      "rufus",
+    "vlc":        "vlc media player",
+    "7zip":       "7-zip",
+    "notepadpp":  "notepad++",
+    "docker":     "docker desktop",
+    "postman":    "postman",
+    "vscode":     "visual studio code",
+    "nodejs":     "node.js",
+    "git":        "git",
+    "python":     "python",
+    "wiztree":    r"wiztree",
+    "windsurf":   r"windsurf",
+    "greenshot":  r"greenshot",
+    "everything": r"^everything$|voidtools everything",
+    "java":       r"java|corretto|jdk",
+    "lm":         r"lm studio",
+    "mysql":      r"mysql server",
+    "postgresql": r"postgresql",
+    "mongodb":    r"mongodb",
+    "redis":      r"redis",
+    "oracle":     r"oracle vm virtualbox|virtualbox",
 }
 
 
@@ -172,6 +257,9 @@ class DetectionAgent(BaseAgent):
         installed: Dict[str, bool] = {}
         for name, cmd in _PROBE_COMMANDS.items():
             result = _probe(cmd)
+            # Fallback to file-path and registry checks if CLI probe fails
+            if not result and (name in _WIN_PATHS or name in _REGISTRY_NAMES):
+                result = _is_installed_gui(name)
             installed[name] = result
             self.logger.debug("  %-12s → %s", name, result)
 
@@ -187,7 +275,7 @@ class DetectionAgent(BaseAgent):
         self.logger.debug("  %-12s → %s", "postman", installed["postman"])
 
         # GUI-only apps: check known install paths + Windows registry
-        for slug in ("rufus", "vlc", "7zip", "notepadpp"):
+        for slug in ("rufus", "vlc", "7zip", "notepadpp", "wiztree", "windsurf", "greenshot", "everything", "lm", "oracle"):
             installed[slug] = _is_installed_gui(slug)
             self.logger.debug("  %-12s → %s", slug, installed[slug])
 

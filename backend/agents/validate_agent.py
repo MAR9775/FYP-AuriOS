@@ -40,12 +40,24 @@ class ValidationAgent(BaseAgent):
             }
 
         self.logger.info("[ACT] ValidationAgent re-detecting software…")
-        detection_result = DetectionAgent().run({})
-        installed_map: Dict[str, bool] = detection_result.get("installed", {})
-
-        validation: Dict[str, bool] = {}
-        for name in expected:
-            validation[name] = bool(installed_map.get(name, False))
+        
+        # Retry loop for background/forking installers (up to 60 seconds)
+        import time
+        max_retries = 30
+        
+        for attempt in range(max_retries):
+            detection_result = DetectionAgent().run({})
+            installed_map: Dict[str, bool] = detection_result.get("installed", {})
+            
+            validation: Dict[str, bool] = {}
+            for name in expected:
+                validation[name] = bool(installed_map.get(name, False))
+                
+            if all(validation.values()):
+                break
+                
+            if attempt < max_retries - 1:
+                time.sleep(2)
 
         return {
             "validation": validation,

@@ -48,17 +48,30 @@ class DownloadAgent(BaseAgent):
                 response = requests.get(url, stream=True, timeout=30)
                 response.raise_for_status()
 
+                content_type = response.headers.get("content-type", "").lower()
+                if "text/html" in content_type:
+                    raise RuntimeError(f"Download URL returned an HTML page. The link might be broken or require authentication.")
+
                 total = int(response.headers.get("content-length", 0))
                 downloaded = 0
+                last_pct = -1
 
-                with open(dest_path, "wb") as f:
+                part_path = dest_path + ".part"
+                with open(part_path, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
                         if chunk:
                             f.write(chunk)
                             downloaded += len(chunk)
                             if total and progress_callback:
-                                pct = (downloaded / total) * 100
-                                progress_callback(round(pct, 1))
+                                pct = int((downloaded / total) * 100)
+                                if pct > last_pct:
+                                    progress_callback(pct)
+                                    last_pct = pct
+                
+                # Download complete, rename to final path
+                if os.path.exists(dest_path):
+                    os.remove(dest_path)
+                os.rename(part_path, dest_path)
 
                 if progress_callback:
                     progress_callback(100)
@@ -72,4 +85,5 @@ class DownloadAgent(BaseAgent):
                     raise RuntimeError(
                         f"Download failed after 3 attempts: {e}"
                     )
-                time.sleep(5)
+                # Exponential backoff: 2s, 4s
+                time.sleep(2 ** attempt)

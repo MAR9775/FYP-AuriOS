@@ -99,6 +99,28 @@ class ConfigureAgent(BaseAgent):
             if "docker" in software_list:
                 dirs_to_add.append(os.path.join(prog_files, "Docker", "Docker", "resources", "bin"))
 
+            # MySQL — bin dir not added to PATH by MSI installer
+            if "mysql" in software_list:
+                for ver in ("9.5", "9.0", "8.4", "8.0"):
+                    d = os.path.join(prog_files, "MySQL", f"MySQL Server {ver}", "bin")
+                    dirs_to_add.append(d)
+
+            # PostgreSQL — bin dir not added to PATH by installer
+            if "postgresql" in software_list:
+                for ver in ("17", "16", "15"):
+                    d = os.path.join(prog_files, "PostgreSQL", ver, "bin")
+                    dirs_to_add.append(d)
+
+            # MongoDB — bin dir not added to PATH by MSI installer
+            if "mongodb" in software_list:
+                for ver in ("8.0", "7.0", "6.0"):
+                    d = os.path.join(prog_files, "MongoDB", "Server", ver, "bin")
+                    dirs_to_add.append(d)
+
+            # Redis — bin dir not added to PATH by MSI installer
+            if "redis" in software_list:
+                dirs_to_add.append(os.path.join(prog_files, "Redis"))
+
             # Filter to directories that actually exist on disk right now
             valid_dirs = [d for d in dirs_to_add if os.path.isdir(d)]
 
