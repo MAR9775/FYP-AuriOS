@@ -23,7 +23,19 @@ def is_admin() -> bool:
     if not is_windows():
         return True
     try:
-        return bool(ctypes.windll.shell32.IsUserAnAdmin())
+        cmd = [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            "([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)"
+        ]
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+        )
+        return "True" in result.stdout
     except Exception:
         return False
 
