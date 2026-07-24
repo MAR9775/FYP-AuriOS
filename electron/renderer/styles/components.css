@@ -5,8 +5,8 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  background: var(--bg-secondary);
-  border: 1px solid #444;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.15);
   border-radius: 20px;
   padding: 5px 14px 5px 6px;
   cursor: pointer;
@@ -15,15 +15,15 @@
   user-select: none;
 }
 .profile-pill:hover {
-  border-color: var(--accent);
-  background: #383838;
+  border-color: rgba(249,115,22,0.5);
+  background: rgba(249,115,22,0.12);
 }
 
 .profile-avatar {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: var(--accent);
+  background: #f97316;
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -35,7 +35,7 @@
 
 #profile-name {
   font-size: 13px;
-  color: var(--text-primary);
+  color: #fff;
   max-width: 100px;
   white-space: nowrap;
   overflow: hidden;
@@ -44,7 +44,7 @@
 
 .pill-caret {
   font-size: 10px;
-  color: var(--text-secondary);
+  color: rgba(255,255,255,0.5);
   margin-left: 2px;
 }
 
@@ -54,12 +54,12 @@
   top: calc(var(--titlebar-h) + 4px);
   right: 12px;
   min-width: 200px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--accent);
-  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   z-index: 200;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
   animation: dropdown-in 0.15s ease;
 }
 .dropdown.hidden { display: none; }
@@ -72,14 +72,17 @@
 .dropdown-item {
   padding: 10px 14px;
   font-size: 13px;
-  color: var(--text-primary);
+  color: #334155;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.dropdown-item:hover { background: #3a3a3a; }
+.dropdown-item:hover { background: #f8fafc; }
 
 .dropdown-email {
-  color: var(--text-secondary);
+  color: #94a3b8;
   font-size: 12px;
   padding-top: 2px;
   cursor: default;
@@ -88,7 +91,7 @@
 
 .dropdown-separator {
   height: 1px;
-  background: #444;
+  background: #f1f5f9;
   margin: 2px 0;
 }
 
@@ -98,7 +101,7 @@
   align-items: baseline;
   gap: 2px;
   padding: 6px 20px;
-  color: var(--text-secondary);
+  color: #94a3b8;
   font-size: 13px;
   font-style: italic;
 }
@@ -111,48 +114,44 @@
 .dot-bounce {
   display: inline-block;
   animation: dot-bounce 1.2s infinite;
-  color: var(--accent);
+  color: #f97316;
   font-weight: 700;
 }
 
 /* ── Message timestamp ──────────────────────────────────────────────────── */
 .msg-timestamp {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: #94a3b8;
   padding: 0 4px;
 }
 
 /* ── Status bar items ───────────────────────────────────────────────────── */
-/* (base rules in main.css; extras here) */
 .status-item {
   position: relative;
 }
 .status-item:hover .status-label {
-  color: var(--text-primary);
+  color: #fff;
 }
-
-/* #agent-status styles now in main.css (sidebar layout) */
 
 /* ── Scrollbar (global thin style) ─────────────────────────────────────── */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--accent) var(--bg-secondary);
+  scrollbar-color: #cbd5e1 #f1f5f9;
 }
 *::-webkit-scrollbar        { width: 6px; height: 6px; }
-*::-webkit-scrollbar-track  { background: var(--bg-secondary); }
-*::-webkit-scrollbar-thumb  { background: var(--accent); border-radius: 3px; }
-*::-webkit-scrollbar-thumb:hover { background: var(--accent-light); }
+*::-webkit-scrollbar-track  { background: #f1f5f9; }
+*::-webkit-scrollbar-thumb  { background: #cbd5e1; border-radius: 3px; }
+*::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
 /* ── Input focus ring ───────────────────────────────────────────────────── */
 #chat-input:focus {
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+  box-shadow: 0 0 0 2px rgba(249,115,22,0.1);
 }
 
 /* ── Mic button active state ────────────────────────────────────────────── */
 #mic-btn.recording,
 #mic-btn.active {
-  color: var(--success, #4ade80);
-  box-shadow: 0 0 12px #c7365f;
+  color: #10b981;
   animation: mic-pulse 1s infinite;
 }
 @keyframes mic-pulse {
@@ -173,7 +172,7 @@
 .wave-bar {
   width: 4px;
   border-radius: 2px;
-  background: var(--accent);
+  background: #f97316;
   animation: wave-bounce 0.7s ease-in-out infinite;
 }
 .wave-bar:nth-child(1) { animation-delay: 0.0s; }
@@ -190,7 +189,7 @@
 /* ── Mic label ──────────────────────────────────────────────────────────── */
 .mic-label {
   font-size: 11px;
-  color: var(--success, #4caf50);
+  color: #10b981;
   text-align: center;
   white-space: nowrap;
 }
@@ -199,17 +198,19 @@
 .dropdown-username {
   font-weight: 600;
   cursor: default;
+  color: #0f172a;
 }
 .dropdown-username:hover { background: transparent; }
 
-.dropdown-danger { color: #ef8080; }
-.dropdown-danger:hover { background: rgba(239,68,68,0.1); color: #ef4444; }
+.dropdown-danger { color: #f87171; }
+.dropdown-danger:hover { background: rgba(248,113,113,0.08); color: #dc2626; }
 
 /* ── Modal overlay ──────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(15,23,42,0.5);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -224,15 +225,15 @@
 }
 
 .modal-container {
-  background: #2d2d2d;
-  border: 1px solid var(--accent);
-  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
   padding: 28px;
   min-width: 340px;
   max-width: 480px;
   width: 90%;
   position: relative;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.12);
   animation: modal-slide-in 0.2s ease;
 }
 
@@ -247,19 +248,19 @@
   right: 14px;
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: #94a3b8;
   font-size: 16px;
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   transition: color 0.2s ease, background 0.2s ease;
 }
-.modal-close:hover { color: var(--text-primary); background: #3a3a3a; }
+.modal-close:hover { color: #0f172a; background: #f1f5f9; }
 
 .modal-title {
   font-size: 16px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #0f172a;
   margin-bottom: 20px;
 }
 
@@ -268,15 +269,15 @@
   justify-content: space-between;
   align-items: flex-start;
   padding: 10px 0;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid #f1f5f9;
   font-size: 13px;
-  color: var(--text-primary);
+  color: #334155;
   gap: 12px;
 }
 .modal-field:last-child { border-bottom: none; }
 
 .modal-field-label {
-  color: var(--text-secondary);
+  color: #94a3b8;
   flex-shrink: 0;
   min-width: 90px;
 }
@@ -284,10 +285,69 @@
 .modal-loading,
 .modal-empty {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: #94a3b8;
   text-align: center;
   padding: 16px 0;
 }
+
+/* ── Modal Input Fields & Buttons ─────────────────────────────────────── */
+.modal-input {
+  flex: 1;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: #0f172a;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  min-width: 0;
+}
+.modal-input:focus {
+  border-color: #f97316;
+  box-shadow: 0 0 0 3px rgba(249,115,22,0.1);
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+.modal-btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.modal-btn-primary {
+  background: #f97316;
+  color: #fff;
+}
+.modal-btn-primary:hover { background: #ea580c; }
+
+.modal-btn-secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+.modal-btn-secondary:hover { background: #e2e8f0; }
+
+.modal-msg {
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+.modal-msg.error   { background: rgba(248,113,113,0.1); color: #dc2626; }
+.modal-msg.success { background: rgba(16,185,129,0.1);  color: #059669; }
 
 /* ── Installation history list ──────────────────────────────────────────── */
 .install-list {
@@ -303,14 +363,15 @@
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  background: #1a1a1a;
-  border-radius: 6px;
+  background: #f8fafc;
+  border-radius: 8px;
   font-size: 12px;
+  border: 1px solid #f1f5f9;
 }
 
 .install-name {
   flex: 1;
-  color: var(--text-primary);
+  color: #0f172a;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -318,7 +379,7 @@
 }
 
 .install-ts {
-  color: var(--text-secondary);
+  color: #94a3b8;
   white-space: nowrap;
   font-size: 11px;
 }
@@ -331,13 +392,13 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 0;
-  border-bottom: 1px solid #3a3a3a;
+  border-bottom: 1px solid #f1f5f9;
 }
 .pref-row:last-child { border-bottom: none; }
 
 .pref-label {
   font-size: 13px;
-  color: var(--text-primary);
+  color: #334155;
 }
 
 /* ── Toggle switch ──────────────────────────────────────────────────────── */
@@ -359,7 +420,7 @@
 .toggle-slider {
   position: absolute;
   inset: 0;
-  background: #555;
+  background: #e2e8f0;
   border-radius: 22px;
   cursor: pointer;
   transition: background 0.25s ease;
@@ -375,10 +436,11 @@
   background: #fff;
   border-radius: 50%;
   transition: transform 0.25s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
 }
 
 .toggle-switch input:checked + .toggle-slider {
-  background: var(--accent);
+  background: #f97316;
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
@@ -400,12 +462,12 @@
 .sw-browser-header h2 {
   font-size: 18px;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #0f172a;
   margin-bottom: 4px;
 }
 .sw-browser-header p {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #64748b;
 }
 
 .sw-browser-grid {
@@ -418,29 +480,30 @@
 }
 
 .sw-card {
-  background: var(--bg-secondary);
-  border: 1px solid #2d3748;
-  border-radius: var(--radius);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: border-color 0.2s ease, transform 0.15s ease;
+  transition: border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 }
 .sw-card:hover {
-  border-color: rgba(99,102,241,0.4);
+  border-color: #f97316;
   transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(249,115,22,0.12);
 }
 
 .sw-card-name {
   font-size: 13px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #0f172a;
 }
 
 .sw-card-meta {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: #64748b;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -450,23 +513,23 @@
   margin-top: auto;
   width: 100%;
   padding: 6px 0;
-  background: var(--accent-dim);
-  border: 1px solid rgba(99,102,241,0.3);
-  border-radius: 6px;
-  color: var(--accent-light);
+  background: rgba(249,115,22,0.08);
+  border: 1px solid rgba(249,115,22,0.25);
+  border-radius: 8px;
+  color: #f97316;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 .sw-install-btn:hover {
-  background: rgba(99,102,241,0.3);
-  border-color: var(--accent);
+  background: rgba(249,115,22,0.15);
+  border-color: #f97316;
 }
 
 .sw-loading {
   text-align: center;
-  color: var(--text-secondary);
+  color: #94a3b8;
   font-size: 13px;
   padding: 32px 0;
 }
@@ -477,14 +540,14 @@
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: #2a2a2a;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
+  background: #1e293b;
+  border: 1px solid rgba(249,115,22,0.4);
+  border-radius: 8px;
   padding: 6px 10px;
   font-size: 12px;
-  color: var(--text-primary);
+  color: #fff;
   white-space: nowrap;
   pointer-events: none;
   z-index: 300;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
 }
